@@ -43,32 +43,34 @@ logger = get_logger(__name__)
     "-v",
     "--verbose",
     is_flag=True,
-    help="Enable DEBUG level logging.",
+    help="Enable DEBUG level logging for troubleshooting.",
 )
 @click.option(
     "-q",
     "--quiet",
     is_flag=True,
-    help="Suppress INFO level logging.",
+    help="Suppress INFO level logging for CI/CD pipelines.",
 )
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
-    """CodeMap - Code impact analyzer and dependency mapper.
+    """CodeMap - Know what breaks before you break it.
 
     Analyze Python codebases to generate dependency graphs and impact maps
-    that link to DevPlanBuilder outputs.
+    that link to DevPlanBuilder outputs. See exactly what will be affected
+    when you change something, with risk scoring and test suggestions.
+
+    For detailed help on any command:
+        codemap <command> --help
 
     Examples:
 
-        codemap analyze --source ./src
-
+        codemap analyze
         codemap impact auth.validate_user
-
-        codemap graph --level module
-
+        codemap graph --level function --module auth
         codemap sync --devplan DEVELOPMENT_PLAN.md
-
         codemap drift --devplan DEVELOPMENT_PLAN.md
+
+    Documentation: https://github.com/your-username/codemap
     """
     # Determine log level
     if verbose:
@@ -89,7 +91,7 @@ def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     type=click.Path(exists=True, file_okay=False),
     default=".",
     show_default=True,
-    help="Source directory to analyze.",
+    help="Source directory to analyze (Python files).",
 )
 @click.option(
     "--output",
@@ -97,31 +99,41 @@ def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     type=click.Path(file_okay=False),
     default=".codemap",
     show_default=True,
-    help="Output directory for generated files.",
+    help="Output directory for CODE_MAP.json and diagrams.",
 )
 @click.option(
     "--exclude",
     "-e",
     multiple=True,
-    help="Patterns to exclude (can be specified multiple times).",
+    help="Patterns to exclude (repeatable, e.g., -e __pycache__ -e .venv).",
 )
 def analyze_command(
     source: str,
     output: str,
     exclude: tuple[str, ...],
 ) -> None:
-    """Analyze codebase and generate CODE_MAP.json and diagrams.
+    """Analyze codebase and generate dependency graph.
 
-    Performs AST analysis on Python files to extract symbols and dependencies,
-    generating a CODE_MAP.json file and Mermaid architecture diagram.
+    Performs AST analysis on Python files to extract all symbols (modules,
+    classes, functions) and their dependencies. Generates:
+    - CODE_MAP.json: Complete dependency graph
+    - ARCHITECTURE.mermaid: Module-level diagram
+
+    This is the first command to run in CodeMap workflow.
 
     Examples:
 
         codemap analyze
+            Analyze current directory, output to .codemap/
 
-        codemap analyze --source ./src --output .codemap
+        codemap analyze --source ./src --output ./output
+            Analyze src/, write to output/
 
-        codemap analyze -e __pycache__ -e .venv
+        codemap analyze -e __pycache__ -e .venv -e tests
+            Exclude multiple patterns from analysis
+
+        codemap -v analyze
+            Run with DEBUG logging for troubleshooting
     """
     logger.info("Starting code analysis on %s", source)
 
@@ -256,7 +268,7 @@ def analyze_command(
     type=int,
     default=3,
     show_default=True,
-    help="Maximum traversal depth for impact analysis.",
+    help="Maximum traversal depth (0 for unlimited).",
 )
 @click.option(
     "--format",
@@ -264,28 +276,46 @@ def analyze_command(
     type=click.Choice(["text", "json", "mermaid"]),
     default="text",
     show_default=True,
-    help="Output format.",
+    help="Output format (text for terminal, json for automation, mermaid for diagrams).",
 )
 def impact_command(
     symbols: tuple[str, ...],
     depth: int,
     format: str,
 ) -> None:
-    """Analyze the impact of changes to specified symbols.
+    """Analyze impact of changing symbols - what breaks when you change this?
 
-    Shows which other symbols would be affected by changes to the input symbols,
-    including transitive impacts and risk scoring.
+    Shows exactly which other symbols would be affected by modifying the input
+    symbols, including direct callers, transitive dependencies, and risk scoring.
 
-    Symbols can be qualified names like 'module.function' or patterns
-    like 'auth.*' for glob matching.
+    SYMBOLS can be:
+    - Qualified names: 'module.function', 'module.ClassName'
+    - Patterns (glob): 'auth.*', 'api.routes.*'
+    - Multiple values: space-separated or quoted strings
+
+    Output includes:
+    - Risk score (0-100 based on blast radius)
+    - Direct impact count and list
+    - Transitive impact count and list
+    - Affected files
+    - Suggested test files to run
 
     Examples:
 
         codemap impact auth.validate_user
+            Show what breaks if validate_user changes
 
-        codemap impact 'auth.*' 'db.*' --depth 5
+        codemap impact 'auth.*'
+            Show impact of all functions in auth module
 
-        codemap impact main.run --format json
+        codemap impact validate_user hash_password --depth 5
+            Show impact of multiple symbols up to 5 levels deep
+
+        codemap impact core.auth.jwt.verify_token --format json
+            Output as JSON for parsing by other tools
+
+        codemap impact api.routes.login --format mermaid
+            Generate Mermaid diagram showing impact
     """
     logger.info("Analyzing impact for symbols: %s", symbols)
 
@@ -363,21 +393,21 @@ def impact_command(
     type=click.Choice(["module", "function"]),
     default="module",
     show_default=True,
-    help="Diagram detail level.",
+    help="Diagram detail level (module shows files, function shows individual functions).",
 )
 @click.option(
     "--module",
     "-m",
     type=str,
     default=None,
-    help="Focus on specific module (function level only).",
+    help="Focus on specific module (required for function-level diagrams).",
 )
 @click.option(
     "--output",
     "-o",
     type=click.Path(),
     default=None,
-    help="Output file (default: stdout).",
+    help="Output file (default: stdout/print to terminal).",
 )
 @click.option(
     "--format",
@@ -385,7 +415,7 @@ def impact_command(
     type=click.Choice(["mermaid", "dot"]),
     default="mermaid",
     show_default=True,
-    help="Output format.",
+    help="Output format (mermaid for GitHub/markdown, dot for GraphViz).",
 )
 def graph_command(
     level: str,
@@ -393,20 +423,34 @@ def graph_command(
     output: str | None,
     format: str,
 ) -> None:
-    """Generate dependency graph diagrams in various formats.
+    """Generate dependency graph diagrams - visualize code structure.
 
     Creates visual representations of code dependencies at module or
-    function level, optionally focused on a specific module.
+    function level. Use Mermaid format for GitHub markdown, DOT for GraphViz.
+
+    Module-level diagrams show how files depend on each other.
+    Function-level diagrams show how functions/methods depend on each other
+    within a specific module.
 
     Examples:
 
         codemap graph
+            Show module-level diagram, print to terminal
+
+        codemap graph -o architecture.mermaid
+            Save module diagram to file
 
         codemap graph --level function --module auth
+            Show function-level diagram for auth module
 
-        codemap graph -o graph.mermaid
+        codemap graph --level function --module api.routes -o diagram.mermaid
+            Zoom into specific submodule
 
-        codemap graph --format dot -o graph.dot
+        codemap graph --format dot -o deps.dot
+            Export as GraphViz DOT format (requires graphviz to render)
+
+        codemap graph -o diagram.mermaid && cat diagram.mermaid
+            Generate and immediately view output
     """
     logger.info(
         "Generating graph diagram (level=%s, module=%s, format=%s)",
@@ -481,24 +525,38 @@ def graph_command(
     "-d",
     type=click.Path(exists=True),
     required=True,
-    help="Path to DEVELOPMENT_PLAN.md file.",
+    help="Path to DEVELOPMENT_PLAN.md (DevPlanBuilder format).",
 )
 @click.option(
     "--update-map",
     is_flag=True,
-    help="Update CODE_MAP.json with task links (dry-run by default).",
+    help="Update CODE_MAP.json with task links (default is dry-run).",
 )
 def sync_command(devplan: str, update_map: bool) -> None:
-    """Link DEVELOPMENT_PLAN.md tasks to code symbols.
+    """Link development plan tasks to code symbols - enable traceability.
 
-    Parses the development plan and creates bidirectional mapping between
-    plan task IDs and code symbols. By default, performs a dry-run.
+    Reads DEVELOPMENT_PLAN.md (DevPlanBuilder format) and creates bidirectional
+    mapping between plan task IDs and actual code symbols. Shows which code
+    implements which planned features.
+
+    Matching uses:
+    - File names (auth.py matches "auth" tasks)
+    - Function/class names (validate_user matches "validate user" tasks)
+    - Keyword overlap with confidence scoring
+
+    By default runs in dry-run mode (shows what would be linked).
+    Use --update-map to write results back to CODE_MAP.json.
 
     Examples:
 
         codemap sync --devplan DEVELOPMENT_PLAN.md
+            Show matches without modifying CODE_MAP.json
 
         codemap sync --devplan DEVELOPMENT_PLAN.md --update-map
+            Update CODE_MAP.json with task_links field on each symbol
+
+        codemap -v sync --devplan DEVELOPMENT_PLAN.md
+            Debug mode to see confidence scores
     """
     logger.info("Syncing development plan from %s", devplan)
 
@@ -560,7 +618,7 @@ def sync_command(devplan: str, update_map: bool) -> None:
     "-o",
     type=click.Path(),
     default=None,
-    help="Output file (default: stdout).",
+    help="Output file (default: print to stdout).",
 )
 @click.option(
     "--format",
@@ -568,25 +626,42 @@ def sync_command(devplan: str, update_map: bool) -> None:
     type=click.Choice(["markdown", "json"]),
     default="markdown",
     show_default=True,
-    help="Output format.",
+    help="Output format (markdown for reports, json for automation).",
 )
 def drift_command(
     devplan: str,
     output: str | None,
     format: str,
 ) -> None:
-    """Generate drift report comparing code to development plan.
+    """Detect architecture drift - planned vs actual discrepancies.
 
-    Detects discrepancies between the DEVELOPMENT_PLAN.md and actual code,
-    reporting architecture drift and missing implementations.
+    Compares DEVELOPMENT_PLAN.md to actual code and reports:
+    - Implemented as planned: symbols that match the plan
+    - Missing: planned features not yet coded
+    - Unplanned: code that wasn't in the original plan (scope creep)
+
+    Generates comprehensive report with:
+    - Summary statistics
+    - Risk assessment and recommendations
+    - Lists of missing and unplanned symbols
+
+    Exit codes:
+    - 0: No drift detected (plan matches code)
+    - 1: Drift detected (missing or unplanned code)
 
     Examples:
 
         codemap drift --devplan DEVELOPMENT_PLAN.md
+            Print drift report to terminal
 
         codemap drift --devplan DEVELOPMENT_PLAN.md -o DRIFT_REPORT.md
+            Save report to file
 
         codemap drift --devplan DEVELOPMENT_PLAN.md --format json
+            Output as JSON for parsing by other tools
+
+        codemap drift --devplan DEVELOPMENT_PLAN.md && echo "No drift"
+            Use exit code in scripts (exit 0 = no drift)
     """
     logger.info("Generating drift report from %s", devplan)
 
@@ -656,35 +731,49 @@ def drift_command(
 @click.option(
     "--pre-commit",
     is_flag=True,
-    help="Install pre-commit hook.",
+    help="Install pre-commit hook (runs before commit).",
 )
 @click.option(
     "--post-commit",
     is_flag=True,
-    help="Install post-commit hook.",
+    help="Install post-commit hook (runs after successful commit).",
 )
 @click.option(
     "--uninstall",
     is_flag=True,
-    help="Remove previously installed hooks.",
+    help="Uninstall previously installed hooks (restores backups).",
 )
 def install_hooks_command(
     pre_commit: bool,
     post_commit: bool,
     uninstall: bool,
 ) -> None:
-    """Install or uninstall git hooks for automatic analysis.
+    """Install git hooks for automatic CodeMap analysis on commits.
 
-    Hooks automatically run CodeMap analysis on commits to keep
-    CODE_MAP.json and drift reports up-to-date.
+    Hooks automatically analyze code on commits to keep CODE_MAP.json
+    and dependency information fresh. Useful for:
+    - Catching impact of changes before they're committed
+    - Keeping drift reports up-to-date in CI/CD
+    - Automating code quality checks
+
+    Pre-commit hooks run before commit (can prevent commit if needed).
+    Post-commit hooks run after successful commit (informational).
+
+    Backups: Existing hooks are backed up before installation (.bak files).
+
+    To skip hooks on specific commits:
+        CODEMAP_SKIP=1 git commit -m "message"
 
     Examples:
 
         codemap install-hooks --pre-commit
+            Enable pre-commit analysis before commits
 
         codemap install-hooks --pre-commit --post-commit
+            Install both hooks
 
         codemap install-hooks --uninstall
+            Remove hooks and restore backups
     """
     logger.info(
         "Managing git hooks (pre=%s, post=%s, uninstall=%s)",
