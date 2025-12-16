@@ -1,5 +1,7 @@
 # CodeMap
 
+![CI](https://github.com/your-username/codemap/actions/workflows/ci.yml/badge.svg)
+
 Code impact analyzer and dependency mapper for Python projects
 
 ## Description
