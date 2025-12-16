@@ -398,9 +398,111 @@ If you encounter an error you cannot resolve:
 
 ## Git Workflow
 
-- **Branch at TASK level** (not subtask): `feature/X.Y-description`
-- **Commit after each subtask** to the task branch
-- **Squash merge when task complete** (all subtasks done)
+### CRITICAL: Follow this workflow exactly for every task
+
+#### 1. Starting a New Task (X.Y)
+
+```bash
+# Ensure you're on main and up to date
+git checkout main
+git pull origin main
+
+# Create feature branch for the TASK (not subtask)
+git checkout -b feature/X.Y-description
+# Example: git checkout -b feature/1.2-ast-analysis
+```
+
+#### 2. After Each Subtask (X.Y.Z)
+
+```bash
+# Stage all changes
+git add .
+
+# Commit with semantic message
+git commit -m "feat(scope): short description
+
+- Deliverable 1 completed
+- Deliverable 2 completed
+- Tests: X tests, Y% coverage"
+
+# Push branch to origin (do this after EVERY subtask)
+git push -u origin feature/X.Y-description
+```
+
+#### 3. When Task is Complete (all X.Y.Z subtasks done)
+
+```bash
+# Ensure all changes are committed and pushed
+git status  # Should be clean
+git push origin feature/X.Y-description
+
+# Switch to main
+git checkout main
+git pull origin main
+
+# Merge the feature branch (squash for clean history)
+git merge --squash feature/X.Y-description
+git commit -m "feat(scope): complete task X.Y - description
+
+- Subtask X.Y.1: description
+- Subtask X.Y.2: description
+- Subtask X.Y.3: description
+- Total: N tests, Y% coverage"
+
+# Push main
+git push origin main
+
+# Delete feature branch (optional, keeps repo clean)
+# git branch -d feature/X.Y-description
+# git push origin --delete feature/X.Y-description
+```
+
+#### Branch Naming Convention
+
+```
+feature/{phase}.{task}-{short-description}
+```
+
+Examples:
+- `feature/0.1-repository-setup`
+- `feature/1.2-ast-analysis`
+- `feature/2.1-mermaid-diagrams`
+- `feature/3.1-analysis-commands`
+
+#### Commit Message Format
+
+```
+type(scope): short description
+
+- Detail 1
+- Detail 2
+- Tests: X tests, Y% coverage
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code restructuring
+- `test`: Test additions
+- `docs`: Documentation
+- `chore`: Maintenance
+
+#### Important Rules
+
+1. **NEVER commit to main directly** - Always use feature branches
+2. **ALWAYS push after each subtask** - Don't accumulate unpushed commits
+3. **ALWAYS merge to main when task completes** - Don't leave feature branches unmerged
+4. **Verify before merge:**
+   ```bash
+   ruff check codemap tests
+   ruff format --check codemap tests
+   mypy codemap
+   pytest tests/ -v --cov=codemap --cov-fail-under=80
+   ```
 
 ---
 
