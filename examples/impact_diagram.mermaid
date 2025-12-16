@@ -1,0 +1,16 @@
+flowchart TD
+    main_login["login()"]:::upstream
+    auth_validate_user["validate_user()"]:::focal
+    auth_hash_password["hash_password()"]:::downstream
+    models_User["User()"]:::downstream
+    main_login --> auth_validate_user
+    auth_validate_user --> auth_hash_password
+    auth_validate_user --> models_User
+    classDef focal stroke:#f00,stroke-width:4px
+    classDef upstream stroke:#0099ff,stroke-width:2px
+    classDef downstream stroke:#00cc00,stroke-width:2px
+    subgraph legend["Legend"]
+        focal_ex["Focal Symbol"]:::focal
+        upstream_ex["Upstream (Callers)"]:::upstream
+        downstream_ex["Downstream (Callees)"]:::downstream
+    end
