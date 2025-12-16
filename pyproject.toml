@@ -40,6 +40,7 @@ dev = [
     "mypy>=1.7",
     "pre-commit>=3.0",
     "types-toml>=0.10.8.7",
+    "types-click>=8.1",
 ]
 
 [project.scripts]

@@ -11,7 +11,6 @@ from codemap import __version__
 @click.version_option(version=__version__)
 def cli() -> None:
     """CodeMap - Code impact analyzer and dependency mapper."""
-    pass
 
 
 if __name__ == "__main__":
