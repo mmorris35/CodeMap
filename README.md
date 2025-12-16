@@ -12,6 +12,21 @@ CodeMap is a CLI tool that analyzes Python codebases to generate dependency grap
 
 Coming soon.
 
+## Configuration
+
+CodeMap can be configured through:
+1. `.codemap.toml` file in the project root
+2. `[tool.codemap]` section in `pyproject.toml`
+
+Example configuration:
+```toml
+[tool.codemap]
+source_dir = "src"
+output_dir = ".codemap"
+exclude_patterns = ["__pycache__", ".venv", "tests"]
+include_tests = true
+```
+
 ## Usage
 
 Coming soon.
