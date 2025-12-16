@@ -114,3 +114,14 @@ class SymbolRegistry:
     def __contains__(self, qualified_name: str) -> bool:
         """Check if symbol exists in registry."""
         return qualified_name in self._by_name
+
+    def add_symbol_data(self, symbol_data: dict[str, object]) -> None:
+        """Add a symbol from CODE_MAP.json data.
+
+        Args:
+            symbol_data: Symbol dictionary from CODE_MAP.json
+        """
+        qualified_name = symbol_data.get("qualified_name", "")
+        if isinstance(qualified_name, str):
+            # Store metadata - we can't fully reconstruct Symbol without parsing
+            self._by_name[qualified_name] = None  # type: ignore

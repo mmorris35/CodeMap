@@ -185,3 +185,16 @@ class DependencyGraph:
     def __contains__(self, symbol: str) -> bool:
         """Check if symbol is in graph."""
         return bool(self._graph.has_node(symbol))
+
+    def add_symbol_data(self, symbol_data: dict[str, object]) -> None:
+        """Add a symbol from CODE_MAP.json data.
+
+        Args:
+            symbol_data: Symbol dictionary from CODE_MAP.json
+        """
+        qualified_name = symbol_data.get("qualified_name", "")
+        if isinstance(qualified_name, str):
+            self._graph.add_node(
+                qualified_name,
+                kind=symbol_data.get("kind", "function"),
+            )

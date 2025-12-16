@@ -267,6 +267,116 @@ flowchart TD
 | **Drift Detection** | Finds code that wasn't in the plan (scope creep!) |
 | **Git Hooks** | Auto-analyze on every commit |
 | **Fast** | < 30 seconds for 50k LOC codebases |
+| **MCP Server** | Claude Code integration via Model Context Protocol |
+
+---
+
+## Claude Code Integration (MCP Server)
+
+**The killer feature:** CodeMap runs as an MCP server on Cloudflare Workers, giving Claude Code real-time dependency awareness. Before Claude modifies your code, it can check what will break.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant CC as Claude Code
+    participant MCP as CodeMap MCP Server
+    participant KV as Cloudflare KV
+
+    Dev->>CC: "Refactor validate_user() to async"
+
+    Note over CC: Before making changes...
+    CC->>MCP: get_impact_report("validate_user")
+    MCP->>KV: Fetch CODE_MAP.json
+    KV-->>MCP: Dependency graph
+    MCP-->>CC: 17 dependents, risk: HIGH
+
+    Note over CC: Understands blast radius
+    CC->>MCP: check_breaking_change("validate_user", "async def...")
+    MCP-->>CC: 5 callers need await
+
+    CC->>Dev: "This affects 17 functions. I'll update the 5 direct callers to use await..."
+    CC->>CC: Makes changes with full context
+```
+
+### How It Works
+
+```mermaid
+flowchart TB
+    subgraph Your Machine
+        CLI["codemap analyze"]
+        JSON["CODE_MAP.json"]
+        CLI --> JSON
+    end
+
+    subgraph Cloudflare Edge
+        subgraph Worker["MCP Server"]
+            MCP["MCP Handler"]
+            Tools["get_dependents()<br>get_impact_report()<br>check_breaking_change()<br>get_architecture()"]
+            MCP --> Tools
+        end
+        KV[(Cloudflare KV)]
+        Tools --> KV
+    end
+
+    subgraph Claude Code
+        Agent["Claude Agent"]
+        Agent -->|"MCP Protocol<br>(JSON-RPC 2.0)"| MCP
+    end
+
+    JSON -->|"POST /projects/{id}/code_map"| KV
+
+    style Agent fill:#7c3aed,stroke:#5b21b6,color:#fff
+    style MCP fill:#f97316,stroke:#c2410c,color:#fff
+    style CLI fill:#339af0,stroke:#1864ab,color:#fff
+```
+
+### MCP Tools Available
+
+| Tool | What Claude Code Uses It For |
+|------|------------------------------|
+| `get_dependents(symbol)` | "What functions call this?" before refactoring |
+| `get_impact_report(symbol)` | Full blast radius analysis with risk score |
+| `check_breaking_change(symbol, new_sig)` | "Will this signature change break callers?" |
+| `get_architecture()` | High-level overview of module dependencies |
+
+### Example: Claude Code Using Impact Analysis
+
+```
+You: "Add rate limiting to the API endpoints"
+
+Claude Code (internally):
+  → Calls get_architecture() to understand API structure
+  → Identifies api.routes module as the target
+  → Calls get_dependents("api.routes.handle_request")
+  → Discovers 12 endpoints depend on it
+  → Plans changes that won't break existing callers
+
+Claude Code: "I'll add a rate_limit decorator to handle_request().
+This affects 12 endpoints but the change is backwards-compatible.
+I'll also add the rate limit config to settings.py..."
+```
+
+### Setup
+
+```bash
+# 1. Generate your project's dependency map
+codemap analyze
+
+# 2. Upload to MCP server
+curl -X POST https://codemap-mcp.your-worker.workers.dev/projects/my-project/code_map \
+  -H "Authorization: Bearer $API_KEY" \
+  -d @CODE_MAP.json
+
+# 3. Configure Claude Code (claude_code_config.json)
+{
+  "mcpServers": {
+    "codemap": {
+      "url": "https://codemap-mcp.your-worker.workers.dev/mcp",
+      "headers": { "Authorization": "Bearer $API_KEY" }
+    }
+  }
+}
+```
 
 ---
 
@@ -425,6 +535,8 @@ ruff check codemap tests && mypy codemap
 - [x] Impact analysis with risk scoring
 - [x] DevPlan integration
 - [x] Drift detection
+- [x] **MCP Server for Claude Code** (Cloudflare Workers)
+- [ ] Cloud deployment (AWS Free Tier)
 - [ ] Interactive web explorer (pyvis)
 - [ ] VSCode extension
 - [ ] CI/CD PR impact comments
