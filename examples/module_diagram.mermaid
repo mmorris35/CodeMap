@@ -1,0 +1,25 @@
+flowchart TD
+    subgraph auth["auth"]
+        auth_validate_user["validate_user()"]
+        auth_hash_password["hash_password()"]
+        auth_check_token["check_token()"]
+    end
+    subgraph db["db"]
+        db_Database["Database()"]
+        db_query["query()"]
+    end
+    subgraph models["models"]
+        models_User["User()"]
+        models_Session["Session()"]
+    end
+    subgraph main["main"]
+        main_login["login()"]
+        main_logout["logout()"]
+    end
+    main_login --> auth_validate_user
+    auth_validate_user --> auth_hash_password
+    auth_validate_user --> models_User
+    auth_check_token --> db_Database
+    models_User --> db_query
+    main_logout --> auth_check_token
+    db_Database --> models_Session
