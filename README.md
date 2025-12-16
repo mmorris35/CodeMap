@@ -16,7 +16,32 @@ Coming soon.
 
 ## Development
 
-Coming soon.
+### Setup
+
+Create and activate virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+Install with development dependencies:
+```bash
+pip install -e ".[dev]"
+```
+
+### Running Tests
+
+```bash
+pytest tests/ -v --cov=codemap
+```
+
+### Code Quality
+
+```bash
+ruff check codemap tests
+ruff format --check codemap tests
+mypy codemap
+```
 
 ## License
 

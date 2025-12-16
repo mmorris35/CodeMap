@@ -28,7 +28,7 @@ dependencies = [
     "click>=8.1",
     "pyan3>=1.2.0",
     "networkx>=3.0",
-    "python-mermaid>=0.3.0",
+    "python-mermaid>=0.1.0",
     "toml>=0.10.2",
 ]
 
