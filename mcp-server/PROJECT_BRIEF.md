@@ -21,6 +21,7 @@
 6. **Project upload endpoint** - `POST /projects/{id}/code_map` to upload CODE_MAP.json
 7. **Cloudflare KV caching** - Cache parsed graphs for fast queries
 8. **Multi-project support** - Isolated analysis per project_id
+9. **Multi-tenant user isolation** - Each API key gets its own namespace (users cannot see each other's projects)
 
 ### Nice-to-Have Features (v2)
 
@@ -62,6 +63,24 @@
 - Response time under 200ms for cached queries
 - CORS enabled for browser-based MCP clients
 
+## Security & Privacy
+
+### Data Stored
+- **CODE_MAP.json**: Symbol names, file paths, line numbers, dependencies (code structure only)
+- **No secrets**: CODE_MAP.json contains no credentials, API keys, or environment variables
+- **No PII**: No usernames, emails, IP addresses, or personal information stored
+
+### User Isolation
+- **API key hashing**: Keys are SHA-256 hashed immediately; plain text never stored
+- **User-scoped storage**: KV keys are `user:{hash}:project:{id}` - users cannot access others' data
+- **No IP logging**: Cloudflare Workers do not log or expose client IP addresses to the application
+- **No cross-tenant access**: Storage layer enforces user ID on all operations
+
+### Multi-Tenancy
+Two users with the same project name (e.g., "my-app") get separate storage:
+- User A (key hash `abc123...`): `user:abc123:project:my-app`
+- User B (key hash `def456...`): `user:def456:project:my-app`
+
 ## Architecture
 
 ```
@@ -82,18 +101,24 @@
 │  │         │                │                             │  │
 │  │         ▼                ▼                             │  │
 │  │  ┌─────────────────────────────────────────────────┐  │  │
-│  │  │              CodeMap Service                     │  │  │
-│  │  │  - parseCodeMap()                               │  │  │
-│  │  │  - getDependents()                              │  │  │
-│  │  │  - getImpactReport()                            │  │  │
-│  │  │  - checkBreakingChange()                        │  │  │
+│  │  │              Auth Middleware                      │  │  │
+│  │  │  - Validate API key                              │  │  │
+│  │  │  - Derive user ID from key hash (SHA-256)        │  │  │
 │  │  └──────────────────────┬──────────────────────────┘  │  │
 │  │                         │                             │  │
 │  │                         ▼                             │  │
 │  │  ┌─────────────────────────────────────────────────┐  │  │
-│  │  │              Cloudflare KV                       │  │  │
-│  │  │  - codemap:{project_id} → CODE_MAP.json         │  │  │
-│  │  │  - cache:{project_id}:{query} → result          │  │  │
+│  │  │              CodeMap Service                     │  │  │
+│  │  │  - getDependents(userId, projectId, ...)        │  │  │
+│  │  │  - getImpactReport(userId, projectId, ...)      │  │  │
+│  │  │  - checkBreakingChange(userId, projectId, ...)  │  │  │
+│  │  └──────────────────────┬──────────────────────────┘  │  │
+│  │                         │                             │  │
+│  │                         ▼                             │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │              Cloudflare KV (User-Scoped)         │  │  │
+│  │  │  - user:{userId}:project:{projectId} → data     │  │  │
+│  │  │  - user:{userId}:cache:{hash} → result          │  │  │
 │  │  └─────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘

@@ -69,13 +69,42 @@ class PyanAnalyzer:
                 nodes = {}
                 edges = []
 
-                # Pyan stores results in the visitor object
-                if hasattr(visitor, "graph"):
-                    graph = visitor.graph
-                    for node in graph.nodes():
-                        nodes[node] = {"node": node}
-                    for edge_from, edge_to in graph.edges():
-                        edges.append((edge_from, edge_to))
+                # Extract nodes from pyan's nodes dict
+                # pyan stores: nodes[key] = [<Node kind:name>, ...]
+                if hasattr(visitor, "nodes"):
+                    for key, node_list in visitor.nodes.items():
+                        for node in node_list:
+                            node_str = str(node)
+                            # Only include function, class, method, and module nodes
+                            if any(
+                                kind in node_str
+                                for kind in ["function:", "class:", "method:", "module:"]
+                            ):
+                                # Extract the qualified name from the node
+                                # Format: <Node kind:qualified.name>
+                                if ":" in node_str and ">" in node_str:
+                                    parts = node_str.split(":", 1)
+                                    if len(parts) == 2:
+                                        qualified_name = parts[1].rstrip(">")
+                                        nodes[qualified_name] = {"node": node_str}
+
+                # Extract edges from defines_edges (function/method calls)
+                if hasattr(visitor, "defines_edges"):
+                    for from_node, to_nodes_set in visitor.defines_edges.items():
+                        from_str = str(from_node)
+                        # Extract qualified name from node string
+                        if ":" in from_str and ">" in from_str:
+                            from_str = from_str.split(":", 1)[1].rstrip(">")
+
+                            # Extract all nodes this one defines
+                            for to_node in to_nodes_set:
+                                to_str = str(to_node)
+                                if ":" in to_str and ">" in to_str:
+                                    to_str = to_str.split(":", 1)[1].rstrip(">")
+
+                                    # Filter out non-code nodes
+                                    if not to_str.startswith("*"):
+                                        edges.append((from_str, to_str))
 
                 return CallGraph(
                     nodes=nodes,

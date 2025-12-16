@@ -16,6 +16,9 @@ from codemap.analyzer import (
     DependencyGraph,
     ImpactAnalyzer,
     PyanAnalyzer,
+    SourceLocation,
+    Symbol,
+    SymbolKind,
     SymbolRegistry,
 )
 from codemap.config import CodeMapConfig, load_config
@@ -127,11 +130,14 @@ def analyze_command(
         output_path = Path(output)
 
         # Load configuration
-        config = CodeMapConfig(
-            source_dir=source_path,
-            output_dir=output_path,
-            exclude_patterns=list(exclude) if exclude else None,
-        )
+        config_kwargs: dict[str, Any] = {
+            "source_dir": source_path,
+            "output_dir": output_path,
+        }
+        if exclude:
+            config_kwargs["exclude_patterns"] = list(exclude)
+
+        config = CodeMapConfig(**config_kwargs)
         logger.debug(
             "Configuration: source=%s, output=%s, exclude=%s",
             config.source_dir,
@@ -164,24 +170,49 @@ def analyze_command(
         analyzer = PyanAnalyzer(exclude_patterns=config.exclude_patterns)
         call_graph = analyzer.analyze_files(python_files)
 
-        # Build symbol registry
+        # Build symbol registry from pyan call graph
         registry = SymbolRegistry()
-        for file_path in call_graph.files_analyzed:
-            from codemap.analyzer import analyze_file
-
-            symbols = analyze_file(file_path)
-            for symbol in symbols:
-                registry.add(symbol)
-
-        click.echo(f"Extracted {len(registry.get_all())} symbols")
-
-        # Build dependency graph
         graph = DependencyGraph()
-        for symbol in registry.get_all():
+
+        # Create Symbol objects from pyan nodes
+        for node_name in call_graph.nodes:
+            # Parse node name to determine kind
+            # pyan format: "module:name", "function:module.name", "method:module.class.name"
+            if ":" in node_name:
+                kind_str, qualified_name = node_name.split(":", 1)
+            else:
+                kind_str = "module"
+                qualified_name = node_name
+
+            # Map pyan kind to SymbolKind
+            kind_mapping = {
+                "module": SymbolKind.MODULE,
+                "function": SymbolKind.FUNCTION,
+                "method": SymbolKind.METHOD,
+                "class": SymbolKind.CLASS,
+            }
+            symbol_kind = kind_mapping.get(kind_str, SymbolKind.FUNCTION)
+
+            # Create location (file will be inferred later)
+            location = SourceLocation(file=source_path, line=1)
+
+            # Create symbol
+            symbol = Symbol(
+                name=qualified_name.split(".")[-1],
+                qualified_name=qualified_name,
+                kind=symbol_kind,
+                location=location,
+            )
+
+            # Add to registry and graph
+            registry.add(symbol)
             graph.add_symbol(symbol)
 
+        # Add dependencies from pyan call graph
         for from_sym, to_sym in call_graph.edges:
             graph.add_dependency(from_sym, to_sym, kind="calls")
+
+        click.echo(f"Extracted {len(registry.get_all())} symbols")
 
         click.echo(f"Built graph with {len(graph.get_edges())} dependencies")
 
@@ -283,11 +314,11 @@ def impact_command(
 
         # Add symbols to registry (simplified - just track names)
         for symbol_data in code_map.get("symbols", []):
-            registry.add_symbol_data(symbol_data)
+            registry.add_symbol_data(symbol_data)  # type: ignore[arg-type]
 
         # Add symbols to graph
         for symbol_data in code_map.get("symbols", []):
-            graph.add_symbol_data(symbol_data)
+            graph.add_symbol_data(symbol_data)  # type: ignore[arg-type]
 
         # Add dependencies
         for dep_data in code_map.get("dependencies", []):
@@ -402,7 +433,7 @@ def graph_command(
         # Reconstruct graph
         graph = DependencyGraph()
         for symbol_data in code_map.get("symbols", []):
-            graph.add_symbol_data(symbol_data)
+            graph.add_symbol_data(symbol_data)  # type: ignore[arg-type]
 
         for dep_data in code_map.get("dependencies", []):
             from_sym = dep_data.get("from_sym", "")
@@ -505,7 +536,7 @@ def sync_command(devplan: str, update_map: bool) -> None:
         click.echo(f"Plan has {len(dev_plan.get_all_subtasks())} subtasks")
 
         if update_map:
-            codemap_gen.save(linked_map, codemap_path)
+            codemap_gen.save(linked_map, codemap_path)  # type: ignore[arg-type]
             click.echo("Updated CODE_MAP.json with task links")
         else:
             click.echo("(Use --update-map to write changes)")
