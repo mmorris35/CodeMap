@@ -1,0 +1,7 @@
+flowchart TD
+    auth_validate_user["validate_user()"]
+    auth_hash_password["hash_password()"]
+    auth_check_token["check_token()"]
+    auth_validate_user --> auth_hash_password
+    auth_validate_user -.-> models_User["models.User()"]
+    auth_check_token -.-> db_Database["db.Database()"]
