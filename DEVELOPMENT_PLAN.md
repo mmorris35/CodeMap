@@ -103,8 +103,8 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 - [x] 5.3.3: Production Checklist and Monitoring
 
 ### Phase 6: MCP Server (Cloudflare Workers)
-- [ ] 6.1.1: Cloudflare Workers Project Setup
-- [ ] 6.1.2: Hono Router and Health Endpoints
+- [x] 6.1.1: Cloudflare Workers Project Setup
+- [x] 6.1.2: Hono Router and Health Endpoints
 - [ ] 6.1.3: Cloudflare KV Integration
 - [ ] 6.2.1: MCP Protocol Handler
 - [ ] 6.2.2: MCP Tool - get_dependents
@@ -2796,16 +2796,16 @@ preview_id = "placeholder-preview"
 - [x] 6.1.1: Cloudflare Workers Project Setup
 
 **Deliverables**:
-- [ ] Create `mcp-server/src/router.ts` with Hono app
-- [ ] Implement `GET /` returning API info and version
-- [ ] Implement `GET /health` returning `{"status": "healthy", "timestamp": "..."}`
-- [ ] Implement `GET /health/ready` checking KV connectivity
-- [ ] Add request logging middleware
-- [ ] Add error handling middleware with proper JSON responses
-- [ ] Add CORS middleware for browser MCP clients
-- [ ] Create `mcp-server/src/types.ts` with shared TypeScript types
-- [ ] Update `src/index.ts` to export Hono app as default
-- [ ] Write test `mcp-server/src/router.test.ts`
+- [x] Create `mcp-server/src/router.ts` with Hono app
+- [x] Implement `GET /` returning API info and version
+- [x] Implement `GET /health` returning `{"status": "healthy", "timestamp": "..."}`
+- [x] Implement `GET /health/ready` checking KV connectivity
+- [x] Add request logging middleware
+- [x] Add error handling middleware with proper JSON responses
+- [x] Add CORS middleware for browser MCP clients
+- [x] Create `mcp-server/src/types.ts` with shared TypeScript types
+- [x] Update `src/index.ts` to export Hono app as default
+- [x] Write test `mcp-server/src/router.test.ts`
 
 **Technology Decisions**:
 - Hono's built-in CORS and logger middleware
@@ -2867,24 +2867,27 @@ export default app;
 - `mcp-server/src/index.ts`
 
 **Success Criteria**:
-- [ ] `GET /` returns JSON with API info
-- [ ] `GET /health` returns 200 with status and timestamp
-- [ ] `GET /health/ready` returns 200 when KV accessible
-- [ ] CORS headers present in responses
-- [ ] Request logging visible in dev console
-- [ ] Errors return JSON with error code and message
-- [ ] `npm test` passes router tests
+- [x] `GET /` returns JSON with API info
+- [x] `GET /health` returns 200 with status and timestamp
+- [x] `GET /health/ready` returns 200 when KV accessible
+- [x] CORS headers present in responses
+- [x] Request logging visible in dev console
+- [x] Errors return JSON with error code and message
+- [x] `npm test` passes router tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented complete Hono router with health check endpoints, CORS middleware, error handling, and request logging. All routes return proper JSON responses with correct status codes.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/router.ts` - 110 lines (Hono app with all middleware and routes)
+  - `mcp-server/src/types.ts` - 71 lines (TypeScript interfaces for Bindings, MCP, Health responses)
+  - `mcp-server/src/router.test.ts` - 261 lines (18 comprehensive tests covering all routes and middleware)
+  - `mcp-server/vitest.config.ts` - 18 lines (Vitest configuration for Cloudflare Workers)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/index.ts` - simplified to import and export router
+- **Tests**: 18 tests, all passing (100% success rate)
+- **Build**: tsc: pass, npm run build: success
 - **Branch**: feature/6.1-workers-foundation
-- **Notes**: (any additional context)
+- **Notes**: Used Hono's native cors() and logger() middleware for clean implementation. Health check returns 503 when KV is disconnected. All routes tested for success, error cases, and response formats.
 
 ---
 
