@@ -1,0 +1,5 @@
+# Local development environment variables
+# Copy to .dev.vars and fill in actual values for local testing
+
+API_KEY=dev-key-12345
+ENVIRONMENT=development
