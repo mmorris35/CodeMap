@@ -1,0 +1,56 @@
+[Unit]
+Description=CodeMap API Service
+Documentation=https://github.com/your-username/codemap
+After=network.target
+
+[Service]
+Type=exec
+User=codemap
+Group=codemap
+WorkingDirectory=/opt/codemap
+EnvironmentFile=/etc/codemap/env
+
+# Pre-start checks
+ExecStartPre=/bin/sh -c 'test -d /opt/codemap/results || mkdir -p /opt/codemap/results'
+ExecStartPre=/bin/chown -R codemap:codemap /opt/codemap/results
+
+# Start the uvicorn application server
+ExecStart=/opt/codemap/venv/bin/uvicorn codemap.api.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 2 \
+    --log-level info
+
+# Reload configuration (SIGHUP)
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=5
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=codemap
+
+# Security and hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/codemap/results /etc/codemap
+
+# Resource limits (appropriate for t2.micro)
+MemoryMax=512M
+MemoryAccounting=yes
+CPUAccounting=yes
+
+[Install]
+WantedBy=multi-user.target

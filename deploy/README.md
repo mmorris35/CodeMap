@@ -194,45 +194,162 @@ CODEMAP_STORAGE=local
 cd /opt/codemap
 sudo bash deploy/install-service.sh
 
-# This creates:
-# - /etc/systemd/system/codemap.service
-# - Enables and starts the service
+# This script:
+# - Validates all prerequisites
+# - Copies /etc/systemd/system/codemap.service
+# - Verifies service file syntax
+# - Enables service to start on boot
+# - Starts the service
+# - Displays status and next steps
 ```
+
+**What the script does:**
+- Verifies CodeMap home directory and virtualenv exist
+- Creates/verifies environment file at `/etc/codemap/env`
+- Sets proper permissions on `/opt/codemap/results`
+- Copies systemd service file to `/etc/systemd/system/`
+- Validates service file with `systemd-analyze verify`
+- Enables service for auto-start on reboot
+- Starts the service immediately
 
 ### 3.3 Manage the Service
 
+**Check Status:**
 ```bash
-# Check service status
+# Check if service is running
 sudo systemctl status codemap
 
-# View logs (follow in real-time)
-sudo journalctl -u codemap -f
+# Check if service is enabled for auto-start
+sudo systemctl is-enabled codemap
 
-# Restart service (after code updates)
-sudo systemctl restart codemap
+# Check if service is active
+sudo systemctl is-active codemap
+```
+
+**Control Service:**
+```bash
+# Start service
+sudo systemctl start codemap
 
 # Stop service
 sudo systemctl stop codemap
 
-# View logs from last 50 lines
+# Restart service (after code updates)
+sudo systemctl restart codemap
+
+# Reload configuration (without restarting)
+sudo systemctl reload codemap
+
+# Check service on next boot
+systemctl is-enabled codemap  # Returns 'enabled' or 'disabled'
+```
+
+**View Logs:**
+```bash
+# View logs in real-time (follow mode)
+sudo journalctl -u codemap -f
+
+# View last 50 lines of logs
 sudo journalctl -u codemap -n 50
 
-# View logs since last 1 hour
+# View logs from last 1 hour
 sudo journalctl -u codemap --since "1 hour ago"
+
+# View logs with timestamps
+sudo journalctl -u codemap -o short
+
+# Export all logs to file
+sudo journalctl -u codemap > codemap-logs.txt
+
+# View error level and above
+sudo journalctl -u codemap -p err
+```
+
+**Service Configuration:**
+```bash
+# Edit environment variables
+sudo nano /etc/codemap/env
+
+# After editing, restart service to apply changes
+sudo systemctl restart codemap
+
+# Create drop-in override directory for local customizations
+# (useful for per-instance configuration)
+sudo mkdir -p /etc/systemd/system/codemap.service.d
+sudo nano /etc/systemd/system/codemap.service.d/override.conf
+sudo systemctl daemon-reload
+sudo systemctl restart codemap
 ```
 
 ### 3.4 Test the API
 
+**Local Testing:**
 ```bash
-# Test health endpoint
+# Test health endpoint (JSON response)
 curl http://localhost:8000/health
 
 # Should return:
 # {"status":"healthy"}
 
-# View API documentation
-# (Only works via CloudFront after HTTPS is set up)
+# Test with verbose output
+curl -v http://localhost:8000/health
+
+# Get response headers
+curl -i http://localhost:8000/health
+```
+
+**View API Documentation:**
+```bash
+# Swagger UI (interactive API docs)
 curl http://localhost:8000/docs
+
+# ReDoc alternative documentation
+curl http://localhost:8000/redoc
+
+# OpenAPI JSON schema
+curl http://localhost:8000/openapi.json
+```
+
+**Test with specific endpoints:**
+```bash
+# Test analyze endpoint (example)
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url":"https://github.com/example/repo","branch":"main"}'
+
+# Get job results
+curl http://localhost:8000/results/{job_id}
+```
+
+### 3.5 Verify Service Persistence
+
+**Test auto-restart on failure:**
+```bash
+# Get service PID
+PID=$(systemctl show -p MainPID --value codemap)
+echo "Service PID: $PID"
+
+# Kill the service process
+sudo kill -9 $PID
+
+# Check if service auto-restarts (wait 5 seconds)
+sleep 5
+sudo systemctl status codemap
+
+# Service should show as active (running) with a new PID
+```
+
+**Test persistence across reboots:**
+```bash
+# Make a note of the service status
+sudo systemctl status codemap
+
+# Simulate what will happen after reboot
+sudo systemctl reboot
+
+# After reboot, SSH back and verify:
+sudo systemctl status codemap  # Should be active (running)
+sudo journalctl -u codemap -n 5  # Should show startup logs
 ```
 
 ## Step 4: Configure CloudFront HTTPS
