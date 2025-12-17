@@ -2,9 +2,9 @@
 
 **Know what breaks before you break it.**
 
-[![Tests](https://github.com/your-username/codemap/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/codemap/actions)
-[![Deploy](https://github.com/your-username/codemap/actions/workflows/deploy.yml/badge.svg)](https://github.com/your-username/codemap/actions/workflows/deploy.yml)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](https://github.com/your-username/codemap)
+[![Tests](https://github.com/mmorris35/CodeMap/actions/workflows/ci.yml/badge.svg)](https://github.com/mmorris35/CodeMap/actions)
+[![Deploy](https://github.com/mmorris35/CodeMap/actions/workflows/deploy.yml/badge.svg)](https://github.com/mmorris35/CodeMap/actions/workflows/deploy.yml)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](https://github.com/mmorris35/CodeMap)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI Version](https://img.shields.io/badge/pypi-v0.1.0-blue.svg)](https://pypi.org/project/codemap/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
