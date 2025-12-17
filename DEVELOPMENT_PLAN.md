@@ -3296,16 +3296,16 @@ export async function getImpactReport(
 - [x] 6.2.3: MCP Tool - get_impact_report
 
 **Deliverables**:
-- [ ] Create `mcp-server/src/mcp/tools/check-breaking-change.ts`
-- [ ] Implement `checkBreakingChange(projectId, symbol, newSignature)` function
-- [ ] Parse old signature from CODE_MAP.json symbol data
-- [ ] Compare parameter counts between old and new signatures
-- [ ] Detect added required parameters (breaking)
-- [ ] Detect removed parameters (breaking)
-- [ ] Detect type changes if available (breaking)
-- [ ] Return `{ breaking_callers, safe_callers, is_breaking, reason }`
-- [ ] Register tool in MCP handler
-- [ ] Write test `mcp-server/src/mcp/tools/check-breaking-change.test.ts`
+- [x] Create `mcp-server/src/mcp/tools/check-breaking-change.ts`
+- [x] Implement `checkBreakingChange(projectId, symbol, newSignature)` function
+- [x] Parse old signature from CODE_MAP.json symbol data
+- [x] Compare parameter counts between old and new signatures
+- [x] Detect added required parameters (breaking)
+- [x] Detect removed parameters (breaking)
+- [x] Detect type changes if available (breaking)
+- [x] Return `{ breaking_callers, safe_callers, is_breaking, reason }`
+- [x] Register tool in MCP handler
+- [x] Write test `mcp-server/src/mcp/tools/check-breaking-change.test.ts`
 
 **Technology Decisions**:
 - Simple signature parsing (not full AST, just parameter detection)
@@ -3364,24 +3364,25 @@ export async function checkBreakingChange(
 - `mcp-server/src/mcp/handler.ts` (register tool)
 
 **Success Criteria**:
-- [ ] Tool detects added required parameters as breaking
-- [ ] Tool detects removed parameters as breaking
-- [ ] Tool allows adding optional parameters at end
-- [ ] Returns all callers as breaking_callers when breaking
-- [ ] Returns helpful suggestion string
-- [ ] Handles missing old signature gracefully
-- [ ] `npm test` passes check_breaking_change tests
+- [x] Tool detects added required parameters as breaking
+- [x] Tool detects removed parameters as breaking
+- [x] Tool allows adding optional parameters at end
+- [x] Returns all callers as breaking_callers when breaking
+- [x] Returns helpful suggestion string
+- [x] Handles missing old signature gracefully
+- [x] `npm test` passes check_breaking_change tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented complete breaking change detection tool that analyzes function/method signature changes to identify which existing callers would be affected. Signature parser handles Python and TypeScript syntax including complex types, variadic parameters, and optional parameters. Breaking change detection identifies: required parameters added/removed, parameter order changes, type changes. Results separate callers into breaking_callers and safe_callers based on change analysis.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/mcp/tools/check-breaking-change.ts` - 359 lines (signature parsing, change analysis, tool handler)
+  - `mcp-server/src/mcp/tools/check-breaking-change.test.ts` - 637 lines (34 comprehensive tests covering all scenarios)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/mcp/handler.ts` - imported handleCheckBreakingChange and integrated tool routing
+- **Tests**: 34 tests in check-breaking-change.test.ts + 188 existing tests = 222 total tests passing (100% pass rate)
+- **Build**: tsc: pass, npm run typecheck: pass
 - **Branch**: feature/6.2-mcp-protocol
-- **Notes**: (any additional context)
+- **Notes**: Signature parser handles edge cases including Python-style signatures (def func(...):), TypeScript styles (function/arrow), complex types (unions, generics), variadic params (*args, **kwargs). Parameter comparison filters out variadic params for proper matching. Preserves empty string signatures as distinct from null. All callers identified through getDependents tool with proper error handling when no callers exist.
 
 ---
 

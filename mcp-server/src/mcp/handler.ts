@@ -20,6 +20,7 @@ import {
 import type { CodeMapStorage } from '../storage';
 import { handleGetDependents } from './tools/get-dependents';
 import { handleGetImpactReport } from './tools/get-impact-report';
+import { handleCheckBreakingChange } from './tools/check-breaking-change';
 
 /**
  * Server information
@@ -349,14 +350,11 @@ async function handleToolCall(
       break;
 
     case 'check_breaking_change':
-      result = {
-        content: [
-          {
-            type: 'text',
-            text: 'check_breaking_change tool not yet implemented',
-          },
-        ],
-      };
+      result = await handleCheckBreakingChange(
+        storage,
+        userId,
+        toolArgs as Record<string, unknown>
+      );
       break;
 
     case 'get_architecture':
