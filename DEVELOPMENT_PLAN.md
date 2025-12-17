@@ -107,16 +107,16 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 - [x] 6.1.2: Hono Router and Health Endpoints
 - [x] 6.1.3: Cloudflare KV Integration
 - [x] 6.2.1: MCP Protocol Handler
-- [ ] 6.2.2: MCP Tool - get_dependents
-- [ ] 6.2.3: MCP Tool - get_impact_report
+- [x] 6.2.2: MCP Tool - get_dependents
+- [x] 6.2.3: MCP Tool - get_impact_report
 - [ ] 6.2.4: MCP Tool - check_breaking_change
 - [ ] 6.2.5: MCP Tool - get_architecture
 - [ ] 6.3.1: REST API for Project Upload
 - [ ] 6.3.2: MCP Resource Endpoint
 - [ ] 6.3.3: Cloudflare Deployment and Testing
 
-**Current**: Phase 0
-**Next**: 0.1.1
+**Current**: Phase 6.2.3
+**Next**: 6.2.4
 
 ---
 
@@ -3196,15 +3196,15 @@ export async function getDependents(
 - [x] 6.2.2: MCP Tool - get_dependents
 
 **Deliverables**:
-- [ ] Create `mcp-server/src/mcp/tools/get-impact-report.ts`
-- [ ] Implement `getImpactReport(projectId, symbol, includeTests?)` function
-- [ ] Reuse `getDependents` for finding affected symbols
-- [ ] Calculate `risk_score` (0-100) based on: count, depth, file spread
-- [ ] Extract `affected_files` from symbol locations
-- [ ] Generate `suggested_tests` by matching test file patterns
-- [ ] Return full `ImpactReport` structure
-- [ ] Register tool in MCP handler
-- [ ] Write test `mcp-server/src/mcp/tools/get-impact-report.test.ts`
+- [x] Create `mcp-server/src/mcp/tools/get-impact-report.ts`
+- [x] Implement `getImpactReport(projectId, symbol, includeTests?)` function
+- [x] Reuse `getDependents` for finding affected symbols
+- [x] Calculate `risk_score` (0-100) based on: count, depth, file spread
+- [x] Extract `affected_files` from symbol locations
+- [x] Generate `suggested_tests` by matching test file patterns
+- [x] Return full `ImpactReport` structure
+- [x] Register tool in MCP handler
+- [x] Write test `mcp-server/src/mcp/tools/get-impact-report.test.ts`
 
 **Technology Decisions**:
 - Risk score formula: `min(100, (directCount * 10) + (transitiveCount * 3) + (fileCount * 5))`
@@ -3262,24 +3262,31 @@ export async function getImpactReport(
 - `mcp-server/src/mcp/handler.ts` (register tool)
 
 **Success Criteria**:
-- [ ] Tool returns complete ImpactReport structure
-- [ ] Risk score calculated and in range 0-100
-- [ ] Risk level matches score thresholds
-- [ ] Affected files extracted from symbol locations
-- [ ] Test files identified and suggested
-- [ ] Summary string generated
-- [ ] `npm test` passes get_impact_report tests
+- [x] Tool returns complete ImpactReport structure
+- [x] Risk score calculated and in range 0-100
+- [x] Risk level matches score thresholds
+- [x] Affected files extracted from symbol locations
+- [x] Test files identified and suggested
+- [x] Summary string generated
+- [x] `npm test` passes get_impact_report tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented comprehensive impact analysis tool that calculates risk scores, identifies affected files, suggests tests, and generates human-readable summaries for code changes
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/mcp/tools/get-impact-report.ts` - 268 lines (main tool implementation)
+  - `mcp-server/src/mcp/tools/get-impact-report.test.ts` - 535 lines (30 comprehensive tests)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/mcp/handler.ts` (imported handleGetImpactReport and registered tool in dispatch)
+- **Tests**: 30 tests, 100% passing (all new tests + all existing tests still pass)
+- **Build**: tsc: pass, npm test: 188/188 passing
 - **Branch**: feature/6.2-mcp-protocol
-- **Notes**: (any additional context)
+- **Notes**:
+  - Implemented risk score formula: (direct*10) + (transitive*3) + (files*5), capped at 100
+  - Risk levels: LOW (0-24), MEDIUM (25-49), HIGH (50-74), CRITICAL (75+)
+  - Reused getDependents tool for dependency discovery
+  - Test file matching by module name (e.g., 'api.ts' matches 'api.test.ts')
+  - Exported getRiskLevel helper for testing and potential reuse
+  - All ImpactReport fields properly populated with detailed analysis
 
 ---
 

@@ -19,6 +19,7 @@ import {
 } from './errors';
 import type { CodeMapStorage } from '../storage';
 import { handleGetDependents } from './tools/get-dependents';
+import { handleGetImpactReport } from './tools/get-impact-report';
 
 /**
  * Server information
@@ -344,14 +345,7 @@ async function handleToolCall(
       break;
 
     case 'get_impact_report':
-      result = {
-        content: [
-          {
-            type: 'text',
-            text: 'get_impact_report tool not yet implemented',
-          },
-        ],
-      };
+      result = await handleGetImpactReport(storage, userId, toolArgs as Record<string, unknown>);
       break;
 
     case 'check_breaking_change':
