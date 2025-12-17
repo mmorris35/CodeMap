@@ -354,14 +354,20 @@ sudo journalctl -u codemap -n 5  # Should show startup logs
 
 ## Step 4: Configure CloudFront HTTPS
 
-See [CloudFront Setup Instructions](./cloudfront-setup.md) for detailed steps.
+See [CloudFront Setup Instructions](./cloudfront-setup.md) for complete step-by-step guide.
 
-**Summary:**
-1. Request free SSL certificate via ACM
-2. Create CloudFront distribution
-3. Point origin to EC2 Elastic IP
-4. Configure cache behaviors
-5. Test via CloudFront domain
+**Quick Summary:**
+1. Request free SSL certificate via AWS Certificate Manager (ACM)
+2. Create CloudFront distribution pointing to EC2 Elastic IP
+3. Configure origin to use HTTP on port 8000
+4. Set viewer protocol to redirect HTTP to HTTPS
+5. Disable caching for API responses (use CachingDisabled policy)
+6. Allow all HTTP methods (GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE)
+7. Test endpoints via CloudFront domain (*.cloudfront.net)
+
+**Configuration Resources:**
+- [cloudfront-setup.md](./cloudfront-setup.md) - Detailed AWS Console walkthrough
+- [cloudfront-policy.json](./cloudfront-policy.json) - Cache policy for API (no caching)
 
 ## Step 5: Security Hardening (Optional but Recommended)
 
