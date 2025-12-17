@@ -105,8 +105,8 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 ### Phase 6: MCP Server (Cloudflare Workers)
 - [x] 6.1.1: Cloudflare Workers Project Setup
 - [x] 6.1.2: Hono Router and Health Endpoints
-- [ ] 6.1.3: Cloudflare KV Integration
-- [ ] 6.2.1: MCP Protocol Handler
+- [x] 6.1.3: Cloudflare KV Integration
+- [x] 6.2.1: MCP Protocol Handler
 - [ ] 6.2.2: MCP Tool - get_dependents
 - [ ] 6.2.3: MCP Tool - get_impact_report
 - [ ] 6.2.4: MCP Tool - check_breaking_change
@@ -3076,24 +3076,28 @@ const TOOLS = [
 - `mcp-server/src/router.ts` (add /mcp route)
 
 **Success Criteria**:
-- [ ] `POST /mcp` accepts JSON-RPC 2.0 requests
-- [ ] `initialize` returns server info and capabilities
-- [ ] `tools/list` returns array of 4 tools with schemas
-- [ ] `resources/list` returns codemap resource
-- [ ] Invalid JSON-RPC returns error code -32600
-- [ ] Unknown method returns error code -32601
-- [ ] `npm test` passes MCP handler tests
+- [x] `POST /mcp` accepts JSON-RPC 2.0 requests
+- [x] `initialize` returns server info and capabilities
+- [x] `tools/list` returns array of 4 tools with schemas
+- [x] `resources/list` returns codemap resource
+- [x] Invalid JSON-RPC returns error code -32600
+- [x] Unknown method returns error code -32601
+- [x] `npm test` passes MCP handler tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented complete MCP protocol handler with JSON-RPC 2.0 request/response handling, server initialization, tool discovery, resource listing, and proper error code compliance. All requests are validated against JSON-RPC 2.0 specification with appropriate error codes (-32700 parse error, -32600 invalid request, -32601 method not found, -32602 invalid params, -32603 internal error). Added POST /mcp endpoint to router with graceful error handling for malformed requests.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/mcp/types.ts` - 119 lines (MCP protocol TypeScript interfaces)
+  - `mcp-server/src/mcp/errors.ts` - 81 lines (JSON-RPC error code constants and helper functions)
+  - `mcp-server/src/mcp/handler.ts` - 385 lines (MCP request handler with initialize, tools/list, resources/list, tools/call methods)
+  - `mcp-server/src/mcp/handler.test.ts` - 688 lines (50 comprehensive tests covering request parsing, validation, method handlers, error codes, edge cases)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/router.ts` - Added POST /mcp route with JSON parsing, error handling, and MCP request delegation
+  - `mcp-server/src/router.test.ts` - Added 7 tests for POST /mcp endpoint covering valid requests, error handling, and tool/resource listing
+- **Tests**: 50 MCP handler tests + 7 router tests for MCP = 57 new tests, total 109 tests passing
+- **Build**: tsc: pass, npm run build: success
 - **Branch**: feature/6.2-mcp-protocol
-- **Notes**: (any additional context)
+- **Notes**: MCP handler properly validates JSON-RPC 2.0 format with comprehensive request validation including jsonrpc version, id field, method, and params type checking. Tool schemas include full parameter definitions for get_dependents, get_impact_report, check_breaking_change, and get_architecture tools (implementations in subtasks 6.2.2-6.2.5). Stub responses currently returned for tool calls as actual tool handlers will be implemented in subsequent subtasks. POST /mcp route handles parse errors separately (400 with -32700) from internal errors (500 with -32603).
 
 ---
 

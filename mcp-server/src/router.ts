@@ -8,6 +8,8 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 
 import type { Bindings, HealthResponse, APIInfoResponse } from './types';
+import { handleMcpRequest } from './mcp/handler';
+import { CodeMapStorage } from './storage';
 
 /**
  * Create and configure the Hono application
@@ -104,6 +106,59 @@ app.get('/health/ready', async (c) => {
       environment: c.env.ENVIRONMENT,
     };
     return c.json(response, 503);
+  }
+});
+
+/**
+ * POST /mcp - MCP Protocol endpoint
+ * Handles JSON-RPC 2.0 requests for MCP protocol
+ *
+ * @returns JSON-RPC 2.0 response
+ */
+app.post('/mcp', async (c) => {
+  try {
+    // Get request body
+    const body = await c.req.text();
+
+    // For now, use a placeholder user ID (will be derived from API key in subtask 6.3.1)
+    const userId = 'anonymous';
+
+    // Create storage instance
+    const storage = new CodeMapStorage(c.env.CODEMAP_KV);
+
+    // Parse request and handle MCP protocol
+    const request = JSON.parse(body);
+    const response = await handleMcpRequest(request, storage, userId);
+
+    return c.json(response);
+  } catch (error) {
+    // Return parse error if JSON is malformed
+    if (error instanceof SyntaxError) {
+      return c.json(
+        {
+          jsonrpc: '2.0',
+          id: null,
+          error: {
+            code: -32700,
+            message: 'Parse error',
+          },
+        },
+        400
+      );
+    }
+
+    // Return internal error for other exceptions
+    return c.json(
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32603,
+          message: 'Internal error',
+        },
+      },
+      500
+    );
   }
 });
 

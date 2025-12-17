@@ -259,3 +259,128 @@ describe('Router - Multiple Requests', () => {
     });
   });
 });
+
+describe('Router - MCP Protocol Route', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POST /mcp accepts JSON-RPC requests', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+
+    expect(response.status).toBe(200);
+    const data = await response.json() as Record<string, unknown>;
+    expect(data.jsonrpc).toBe('2.0');
+    expect(data.id).toBe(1);
+    expect('result' in data).toBe(true);
+  });
+
+  it('POST /mcp initialize returns server capabilities', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = await response.json() as any;
+
+    expect(data.result.serverInfo).toBeDefined();
+    expect(data.result.serverInfo.name).toBe('codemap-mcp');
+    expect(data.result.capabilities).toBeDefined();
+  });
+
+  it('POST /mcp tools/list returns available tools', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = await response.json() as any;
+
+    expect(data.result.tools).toBeDefined();
+    expect(Array.isArray(data.result.tools)).toBe(true);
+    expect(data.result.tools.length).toBe(4);
+  });
+
+  it('POST /mcp resources/list returns available resources', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'resources/list',
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = await response.json() as any;
+
+    expect(data.result.resources).toBeDefined();
+    expect(Array.isArray(data.result.resources)).toBe(true);
+  });
+
+  it('POST /mcp returns parse error for invalid JSON', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: '{invalid json',
+    });
+
+    const response = await app.fetch(request, mockBindings);
+
+    expect(response.status).toBe(400);
+    const data = await response.json() as any;
+    expect(data.error.code).toBe(-32700);
+    expect(data.error.message).toContain('Parse error');
+  });
+
+  it('POST /mcp returns method not found error', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'unknown_method',
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = await response.json() as any;
+
+    expect(data.error.code).toBe(-32601);
+  });
+
+  it('POST /mcp handles malformed requests gracefully', async () => {
+    const request = new Request('http://localhost/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 1,
+        method: 'initialize',
+        // missing jsonrpc
+      }),
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = await response.json() as any;
+
+    expect(data.error).toBeDefined();
+    expect(data.error.code).toBe(-32600);
+  });
+});
