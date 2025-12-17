@@ -3107,15 +3107,15 @@ const TOOLS = [
 - [x] 6.2.1: MCP Protocol Handler
 
 **Deliverables**:
-- [ ] Create `mcp-server/src/mcp/tools/get-dependents.ts`
-- [ ] Implement `getDependents(projectId, symbol, depth?)` function
-- [ ] Parse CODE_MAP.json dependencies to build reverse lookup
-- [ ] Traverse graph to find all callers (direct and transitive)
-- [ ] Support optional `depth` parameter to limit traversal
-- [ ] Return structured result: `{ symbol, direct: [...], transitive: [...], total: N }`
-- [ ] Handle symbol not found with clear error message
-- [ ] Register tool in MCP handler
-- [ ] Write test `mcp-server/src/mcp/tools/get-dependents.test.ts`
+- [x] Create `mcp-server/src/mcp/tools/get-dependents.ts`
+- [x] Implement `getDependents(projectId, symbol, depth?)` function
+- [x] Parse CODE_MAP.json dependencies to build reverse lookup
+- [x] Traverse graph to find all callers (direct and transitive)
+- [x] Support optional `depth` parameter to limit traversal
+- [x] Return structured result: `{ symbol, direct: [...], transitive: [...], total: N }`
+- [x] Handle symbol not found with clear error message
+- [x] Register tool in MCP handler
+- [x] Write test `mcp-server/src/mcp/tools/get-dependents.test.ts`
 
 **Technology Decisions**:
 - Build adjacency list from dependencies array
@@ -3168,24 +3168,25 @@ export async function getDependents(
 - `mcp-server/src/mcp/handler.ts` (register tool)
 
 **Success Criteria**:
-- [ ] Tool returns direct callers of a symbol
-- [ ] Tool returns transitive callers with BFS
-- [ ] `depth` parameter limits traversal depth
-- [ ] Missing symbol returns clear error
-- [ ] Missing project returns clear error
-- [ ] Empty dependents returns `{ direct: [], transitive: [], total: 0 }`
-- [ ] `npm test` passes get_dependents tests
+- [x] Tool returns direct callers of a symbol
+- [x] Tool returns transitive callers with BFS
+- [x] `depth` parameter limits traversal depth
+- [x] Missing symbol returns clear error
+- [x] Missing project returns clear error
+- [x] Empty dependents returns `{ direct: [], transitive: [], total: 0 }`
+- [x] `npm test` passes get_dependents tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented the `get_dependents` MCP tool for analyzing code dependencies. The tool accepts project_id, symbol, and optional depth parameters. It builds a reverse dependency map from CODE_MAP.json to find all symbols that call (depend on) a given symbol. Uses BFS traversal to discover both direct and transitive dependents. Results are enriched with file location information. Integrated with MCP handler to respond to tools/call requests.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/mcp/tools/get-dependents.ts` - 160 lines (getDependents function and handleGetDependents MCP handler)
+  - `mcp-server/src/mcp/tools/get-dependents.test.ts` - 556 lines (42 comprehensive tests)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/mcp/handler.ts` - Added import for handleGetDependents, updated handleMcpRequest to accept storage/userId parameters, integrated tool call routing for get_dependents
+- **Tests**: 42 tests in get-dependents.test.ts + 116 existing tests = 158 total tests passing (100% pass rate)
+- **Build**: tsc: pass, all TypeScript strict mode checks pass
 - **Branch**: feature/6.2-mcp-protocol
-- **Notes**: (any additional context)
+- **Notes**: Tool uses BFS for efficient graph traversal with cycle detection via visited set. Depth parameter supports unlimited traversal (depth=0 or undefined), fixed depth (depth >= 1). Handler validates all input parameters and returns structured MCP error responses. File location information defaults to 'unknown' if symbol not found in symbol map (edge case handling).
 
 ---
 

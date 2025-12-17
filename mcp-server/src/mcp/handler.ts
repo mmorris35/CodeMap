@@ -18,6 +18,7 @@ import {
   createInvalidRequest,
 } from './errors';
 import type { CodeMapStorage } from '../storage';
+import { handleGetDependents } from './tools/get-dependents';
 
 /**
  * Server information
@@ -142,10 +143,8 @@ const RESOURCES: Resource[] = [
  */
 export async function handleMcpRequest(
   request: unknown,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _storage: CodeMapStorage,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _userId: string
+  storage: CodeMapStorage,
+  userId: string
 ): Promise<JSONRPCResponseType> {
   let parsedRequest: JSONRPCRequest;
 
@@ -182,7 +181,7 @@ export async function handleMcpRequest(
         return handleToolsList(id);
 
       case 'tools/call':
-        return await handleToolCall(id, params);
+        return await handleToolCall(id, params, storage, userId);
 
       case 'resources/list':
         return handleResourcesList(id);
@@ -294,7 +293,9 @@ function handleResourcesList(id: string | number | null): JSONRPCResponseType {
  */
 async function handleToolCall(
   id: string | number | null,
-  params: unknown
+  params: unknown,
+  storage: CodeMapStorage,
+  userId: string
 ): Promise<JSONRPCResponseType> {
   if (typeof params !== 'object' || params === null) {
     return {
@@ -335,19 +336,11 @@ async function handleToolCall(
   }
 
   // Route to tool implementation
-  // For now, return stub responses (actual tools will be implemented in subtasks 6.2.2-6.2.5)
   let result: unknown;
 
   switch (toolName) {
     case 'get_dependents':
-      result = {
-        content: [
-          {
-            type: 'text',
-            text: 'get_dependents tool not yet implemented',
-          },
-        ],
-      };
+      result = await handleGetDependents(storage, userId, toolArgs as Record<string, unknown>);
       break;
 
     case 'get_impact_report':
