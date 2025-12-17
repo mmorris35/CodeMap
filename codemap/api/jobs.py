@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import tempfile
@@ -10,13 +9,16 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from codemap.analyzer import PyanAnalyzer, SymbolRegistry
 from codemap.api.models import JobStatus
 from codemap.config import CodeMapConfig
 from codemap.logging_config import get_logger
 from codemap.output import CodeMapGenerator, MermaidGenerator
+
+if TYPE_CHECKING:
+    from codemap.api.storage import ResultsStorage
 
 logger = get_logger(__name__)
 
@@ -50,23 +52,23 @@ class JobManager:
     """Manages analysis jobs for the CodeMap API.
 
     Maintains in-memory job storage and provides methods for creating,
-    retrieving, and managing analysis jobs.
+    retrieving, and managing analysis jobs. Delegates persistent storage
+    operations to ResultsStorage.
 
     Attributes:
         _jobs: Dictionary mapping job IDs to Job objects.
-        _results_dir: Base directory for storing job results.
+        _storage: ResultsStorage instance for persistent result storage.
     """
 
-    def __init__(self, results_dir: Path) -> None:
+    def __init__(self, storage: ResultsStorage) -> None:
         """Initialize the job manager.
 
         Args:
-            results_dir: Base directory for storing job results.
+            storage: ResultsStorage instance for persisting job results.
         """
         self._jobs: dict[str, Job] = {}
-        self._results_dir = results_dir
-        self._results_dir.mkdir(parents=True, exist_ok=True)
-        logger.debug("JobManager initialized with results_dir=%s", results_dir)
+        self._storage = storage
+        logger.debug("JobManager initialized with storage=%s", storage)
 
     def create_job(
         self,
@@ -123,15 +125,7 @@ class JobManager:
         Raises:
             FileNotFoundError: If diagram file not found.
         """
-        job = self.get_job(job_id)
-        if job is None or job.result_path is None:
-            raise FileNotFoundError(f"No results for job {job_id}")
-
-        diagram_file = job.result_path / f"{diagram_type}.mermaid"
-        if not diagram_file.exists():
-            raise FileNotFoundError(f"Diagram {diagram_type} not found for job {job_id}")
-
-        return diagram_file.read_text()
+        return self._storage.get_diagram(job_id, diagram_type)
 
     def get_code_map(self, job_id: str) -> dict[str, object]:
         """Retrieve CODE_MAP.json for a job.
@@ -145,17 +139,7 @@ class JobManager:
         Raises:
             FileNotFoundError: If CODE_MAP.json not found.
         """
-        job = self.get_job(job_id)
-        if job is None or job.result_path is None:
-            raise FileNotFoundError(f"No results for job {job_id}")
-
-        code_map_file = job.result_path / "CODE_MAP.json"
-        if not code_map_file.exists():
-            raise FileNotFoundError(f"CODE_MAP not found for job {job_id}")
-
-        result = json.loads(code_map_file.read_text())
-        assert isinstance(result, dict)
-        return result
+        return self._storage.get_code_map(job_id)
 
     async def run_job(self, job_id: str) -> None:
         """Run analysis for a job.
@@ -211,7 +195,7 @@ class JobManager:
             logger.debug("Repository cloned successfully")
 
             # Create result directory
-            result_dir = self._results_dir / job_id
+            result_dir = self._storage.get_job_dir(job_id)
             result_dir.mkdir(parents=True, exist_ok=True)
             job.result_path = result_dir
             logger.debug("Created result directory: %s", result_dir)
@@ -229,30 +213,20 @@ class JobManager:
             # Generate CODE_MAP.json
             code_map_generator = CodeMapGenerator(symbol_registry, graph, config)
             code_map = code_map_generator.generate()
-            code_map_file = result_dir / "CODE_MAP.json"
-            code_map_file.write_text(json.dumps(code_map, indent=2))
-            logger.debug("Generated CODE_MAP.json: %s", code_map_file)
+            logger.debug("Generated CODE_MAP.json for job %s", job_id)
 
             # Generate Mermaid diagrams
             mermaid_generator = MermaidGenerator(graph, symbol_registry)
+            diagrams = {
+                "module": mermaid_generator.generate_module_diagram(),
+                "function": mermaid_generator.generate_function_diagram(),
+                "impact": mermaid_generator.generate_impact_diagram(),
+            }
+            logger.debug("Generated %d diagrams for job %s", len(diagrams), job_id)
 
-            # Module-level diagram
-            module_diagram = mermaid_generator.generate_module_diagram()
-            module_file = result_dir / "module.mermaid"
-            module_file.write_text(module_diagram)
-            logger.debug("Generated module diagram: %s", module_file)
-
-            # Function-level diagram
-            function_diagram = mermaid_generator.generate_function_diagram()
-            function_file = result_dir / "function.mermaid"
-            function_file.write_text(function_diagram)
-            logger.debug("Generated function diagram: %s", function_file)
-
-            # Impact diagram
-            impact_diagram = mermaid_generator.generate_impact_diagram()
-            impact_file = result_dir / "impact.mermaid"
-            impact_file.write_text(impact_diagram)
-            logger.debug("Generated impact diagram: %s", impact_file)
+            # Save results to storage
+            self._storage.save_results(job_id, code_map, diagrams)
+            logger.debug("Saved results to storage for job %s", job_id)
 
             # Mark job as completed
             job.status = JobStatus.COMPLETED

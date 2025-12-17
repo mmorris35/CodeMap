@@ -22,11 +22,13 @@ class CodeMapConfig:
         default_factory=lambda: ["__pycache__", ".venv", "venv", "site-packages"]
     )
     include_tests: bool = True
+    results_dir: Path = field(default_factory=lambda: Path.cwd() / "results")
 
     def __post_init__(self) -> None:
         """Validate and normalize paths."""
         self.source_dir = self.source_dir.resolve()
         self.output_dir = self.output_dir.resolve()
+        self.results_dir = self.results_dir.resolve()
 
 
 def load_config(config_path: Path | None = None) -> CodeMapConfig:
@@ -87,8 +89,18 @@ def _create_config_from_dict(config_dict: dict[str, object]) -> CodeMapConfig:
     if isinstance(output_dir, str):
         config_dict["output_dir"] = Path(output_dir)
 
+    results_dir = config_dict.get("results_dir")
+    if isinstance(results_dir, str):
+        config_dict["results_dir"] = Path(results_dir)
+
     # Filter to only known fields
-    valid_fields = {"source_dir", "output_dir", "exclude_patterns", "include_tests"}
+    valid_fields = {
+        "source_dir",
+        "output_dir",
+        "exclude_patterns",
+        "include_tests",
+        "results_dir",
+    }
     filtered_dict = {k: v for k, v in config_dict.items() if k in valid_fields}
 
     # Type cast for mypy
@@ -99,4 +111,5 @@ def _create_config_from_dict(config_dict: dict[str, object]) -> CodeMapConfig:
             "exclude_patterns", ["__pycache__", ".venv", "venv", "site-packages"]
         ),
         include_tests=filtered_dict.get("include_tests", True),  # type: ignore
+        results_dir=filtered_dict.get("results_dir", Path.cwd() / "results"),  # type: ignore
     )

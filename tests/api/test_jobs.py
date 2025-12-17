@@ -8,13 +8,14 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from codemap.api.jobs import Job, JobManager
 from codemap.api.models import JobStatus
+from codemap.api.storage import ResultsStorage
 
 if TYPE_CHECKING:
     pass
@@ -53,7 +54,8 @@ def job_manager(temp_results_dir: Path) -> JobManager:
     Returns:
         JobManager instance.
     """
-    return JobManager(temp_results_dir)
+    storage = ResultsStorage(temp_results_dir)
+    return JobManager(storage)
 
 
 class TestJobDataclass:
@@ -130,7 +132,8 @@ class TestJobManagerInit:
             results_dir = Path(tmpdir) / "results"
             assert not results_dir.exists()
 
-            JobManager(results_dir)
+            storage = ResultsStorage(results_dir)
+            JobManager(storage)
 
             assert results_dir.exists()
             assert results_dir.is_dir()
@@ -141,15 +144,17 @@ class TestJobManagerInit:
             results_dir = Path(tmpdir) / "results"
             results_dir.mkdir()
 
-            job_manager = JobManager(results_dir)
+            storage = ResultsStorage(results_dir)
+            job_manager = JobManager(storage)
 
             assert results_dir.exists()
-            assert job_manager._results_dir == results_dir
+            assert job_manager._storage == storage
 
     def test_job_manager_initializes_empty_jobs(self) -> None:
         """Test that JobManager starts with empty jobs dictionary."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            job_manager = JobManager(Path(tmpdir))
+            storage = ResultsStorage(Path(tmpdir))
+            job_manager = JobManager(storage)
 
             assert len(job_manager._jobs) == 0
             assert job_manager._jobs == {}
@@ -281,16 +286,12 @@ class TestJobManagerGetDiagram:
         Args:
             job_manager: JobManager fixture.
         """
-        # Create job with result path
+        # Create job
         job = job_manager.create_job("https://github.com/user/repo.git")
-        result_dir = job_manager._results_dir / job.id
-        result_dir.mkdir(parents=True, exist_ok=True)
-        job.result_path = result_dir
 
-        # Write diagram file
+        # Write diagram file via storage
         diagram_content = "graph TD\n  A[Module A]\n  B[Module B]"
-        diagram_file = result_dir / "module.mermaid"
-        diagram_file.write_text(diagram_content)
+        job_manager._storage.save_results(job.id, {}, {"module": diagram_content})
 
         # Retrieve diagram
         retrieved_content = job_manager.get_diagram(job.id, "module")
@@ -303,7 +304,7 @@ class TestJobManagerGetDiagram:
         Args:
             job_manager: JobManager fixture.
         """
-        with pytest.raises(FileNotFoundError, match="No results for job"):
+        with pytest.raises(FileNotFoundError, match="Diagram module not found"):
             job_manager.get_diagram("nonexistent_id", "module")
 
     def test_get_diagram_raises_for_missing_file(self, job_manager: JobManager) -> None:
@@ -313,9 +314,7 @@ class TestJobManagerGetDiagram:
             job_manager: JobManager fixture.
         """
         job = job_manager.create_job("https://github.com/user/repo.git")
-        result_dir = job_manager._results_dir / job.id
-        result_dir.mkdir(parents=True, exist_ok=True)
-        job.result_path = result_dir
+        job_manager._storage.save_results(job.id, {}, {})
 
         with pytest.raises(FileNotFoundError, match="Diagram module not found"):
             job_manager.get_diagram(job.id, "module")
@@ -327,15 +326,13 @@ class TestJobManagerGetDiagram:
             job_manager: JobManager fixture.
         """
         job = job_manager.create_job("https://github.com/user/repo.git")
-        result_dir = job_manager._results_dir / job.id
-        result_dir.mkdir(parents=True, exist_ok=True)
-        job.result_path = result_dir
 
-        # Write multiple diagram types
+        # Write multiple diagram types via storage
         diagram_types = ["module", "function", "impact"]
-        for diagram_type in diagram_types:
-            diagram_file = result_dir / f"{diagram_type}.mermaid"
-            diagram_file.write_text(f"graph TD\n  [{diagram_type.upper()}]")
+        diagrams = {
+            diagram_type: f"graph TD\n  [{diagram_type.upper()}]" for diagram_type in diagram_types
+        }
+        job_manager._storage.save_results(job.id, {}, diagrams)
 
         # Retrieve each type
         for diagram_type in diagram_types:
@@ -353,20 +350,18 @@ class TestJobManagerGetCodeMap:
             job_manager: JobManager fixture.
         """
         job = job_manager.create_job("https://github.com/user/repo.git")
-        result_dir = job_manager._results_dir / job.id
-        result_dir.mkdir(parents=True, exist_ok=True)
-        job.result_path = result_dir
 
-        # Write CODE_MAP.json
-        code_map_data = {
+        # Create CODE_MAP.json
+        code_map_data: dict[str, object] = {
             "version": "1.0",
             "files": {
                 "main.py": {"symbols": ["main"]},
                 "utils.py": {"symbols": ["helper"]},
             },
         }
-        code_map_file = result_dir / "CODE_MAP.json"
-        code_map_file.write_text(json.dumps(code_map_data))
+
+        # Save via storage
+        job_manager._storage.save_results(job.id, code_map_data, cast(dict[str, str], {}))
 
         # Retrieve code map
         retrieved = job_manager.get_code_map(job.id)
@@ -383,7 +378,7 @@ class TestJobManagerGetCodeMap:
         Args:
             job_manager: JobManager fixture.
         """
-        with pytest.raises(FileNotFoundError, match="No results for job"):
+        with pytest.raises(FileNotFoundError, match="CODE_MAP not found"):
             job_manager.get_code_map("nonexistent_id")
 
     def test_get_code_map_raises_for_missing_file(self, job_manager: JobManager) -> None:
@@ -393,9 +388,8 @@ class TestJobManagerGetCodeMap:
             job_manager: JobManager fixture.
         """
         job = job_manager.create_job("https://github.com/user/repo.git")
-        result_dir = job_manager._results_dir / job.id
-        result_dir.mkdir(parents=True, exist_ok=True)
-        job.result_path = result_dir
+        # Create job directory but don't save any results
+        job_manager._storage.get_job_dir(job.id).mkdir(parents=True, exist_ok=True)
 
         with pytest.raises(FileNotFoundError, match="CODE_MAP not found"):
             job_manager.get_code_map(job.id)

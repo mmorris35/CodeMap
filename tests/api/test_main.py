@@ -16,6 +16,7 @@ from codemap.api.jobs import JobManager
 from codemap.api.main import app
 from codemap.api.models import JobStatus
 from codemap.api.routes import set_job_manager
+from codemap.api.storage import ResultsStorage
 
 if TYPE_CHECKING:
     pass
@@ -52,7 +53,8 @@ def job_manager(temp_results_dir: Path) -> JobManager:
     Returns:
         JobManager instance.
     """
-    manager = JobManager(temp_results_dir)
+    storage = ResultsStorage(temp_results_dir)
+    manager = JobManager(storage)
     set_job_manager(manager)
     return manager
 
@@ -302,7 +304,7 @@ class TestGraphEndpoint:
         # Create job and mark as completed
         job = job_manager.create_job("https://github.com/user/repo.git")
         job.status = JobStatus.COMPLETED
-        job.result_path = Path(job_manager._results_dir) / job.id
+        job.result_path = job_manager._storage.get_job_dir(job.id)
         job.result_path.mkdir(parents=True, exist_ok=True)
 
         # Try to get graph
@@ -321,7 +323,7 @@ class TestGraphEndpoint:
         # Create job and mark as completed with diagram
         job = job_manager.create_job("https://github.com/user/repo.git")
         job.status = JobStatus.COMPLETED
-        job.result_path = Path(job_manager._results_dir) / job.id
+        job.result_path = job_manager._storage.get_job_dir(job.id)
         job.result_path.mkdir(parents=True, exist_ok=True)
 
         # Write a diagram file
@@ -376,7 +378,7 @@ class TestCodemapEndpoint:
         # Create job and mark as completed with CODE_MAP.json
         job = job_manager.create_job("https://github.com/user/repo.git")
         job.status = JobStatus.COMPLETED
-        job.result_path = Path(job_manager._results_dir) / job.id
+        job.result_path = job_manager._storage.get_job_dir(job.id)
         job.result_path.mkdir(parents=True, exist_ok=True)
 
         # Write a CODE_MAP.json file
@@ -408,7 +410,7 @@ class TestCodemapEndpoint:
         # Create job and mark as completed without CODE_MAP.json
         job = job_manager.create_job("https://github.com/user/repo.git")
         job.status = JobStatus.COMPLETED
-        job.result_path = Path(job_manager._results_dir) / job.id
+        job.result_path = job_manager._storage.get_job_dir(job.id)
         job.result_path.mkdir(parents=True, exist_ok=True)
 
         response = client.get(f"/api/v1/results/{job.id}/codemap")

@@ -2245,15 +2245,15 @@ class DevPlanParser:
 - [x] 5.1.2: Background Job Processing
 
 **Deliverables**:
-- [ ] Create `codemap/api/storage.py` with results storage
-- [ ] Implement `ResultsStorage` class with local filesystem backend
-- [ ] Implement `save_results(job_id, code_map, diagrams)` method
-- [ ] Implement `get_code_map(job_id) -> dict` method
-- [ ] Implement `get_diagram(job_id, diagram_type) -> str` method
-- [ ] Implement `list_jobs() -> List[Job]` method
-- [ ] Implement `delete_results(job_id)` method for cleanup
-- [ ] Add results directory configuration to `CodeMapConfig`
-- [ ] Write test `tests/api/test_storage.py`
+- [x] Create `codemap/api/storage.py` with results storage
+- [x] Implement `ResultsStorage` class with local filesystem backend
+- [x] Implement `save_results(job_id, code_map, diagrams)` method
+- [x] Implement `get_code_map(job_id) -> dict` method
+- [x] Implement `get_diagram(job_id, diagram_type) -> str` method
+- [x] Implement `list_jobs() -> List[Job]` method
+- [x] Implement `delete_results(job_id)` method for cleanup
+- [x] Add results directory configuration to `CodeMapConfig`
+- [x] Write test `tests/api/test_storage.py`
 
 **Technology Decisions**:
 - Local filesystem storage (S3-compatible interface for future)
@@ -2269,24 +2269,29 @@ class DevPlanParser:
 - `codemap/api/jobs.py`
 
 **Success Criteria**:
-- [ ] `save_results()` writes CODE_MAP.json and diagrams to disk
-- [ ] `get_code_map()` returns parsed JSON
-- [ ] `get_diagram()` returns Mermaid string
-- [ ] `list_jobs()` returns all stored job metadata
-- [ ] `delete_results()` removes job directory
-- [ ] Results directory is configurable
-- [ ] `pytest tests/api/test_storage.py -v` passes
+- [x] `save_results()` writes CODE_MAP.json and diagrams to disk
+- [x] `get_code_map()` returns parsed JSON
+- [x] `get_diagram()` returns Mermaid string
+- [x] `list_jobs()` returns all stored job metadata
+- [x] `delete_results()` removes job directory
+- [x] Results directory is configurable
+- [x] `pytest tests/api/test_storage.py -v` passes
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Created dedicated `ResultsStorage` class for persistent job result storage with local filesystem backend. ResultsStorage handles CODE_MAP.json and Mermaid diagram persistence. Refactored JobManager to delegate storage operations to ResultsStorage instead of direct filesystem access. Added `results_dir` configuration to CodeMapConfig with path normalization. Updated main.py to initialize ResultsStorage from config at application startup. Implemented methods for saving, retrieving, listing, and deleting job results. Added extensible metadata storage capability for future S3 integration.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `codemap/api/storage.py` - 276 lines (ResultsStorage class with 9 public methods)
+  - `tests/api/test_storage.py` - 471 lines (34 comprehensive tests organized in 10 test classes)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: (ruff: pass/fail, mypy: pass/fail)
+  - `codemap/config.py` - added `results_dir` field with default value and path normalization
+  - `codemap/api/jobs.py` - refactored to use ResultsStorage instead of direct filesystem operations
+  - `codemap/api/main.py` - updated lifespan to create ResultsStorage from config
+  - `tests/api/test_jobs.py` - updated fixtures and tests to work with new storage abstraction
+  - `tests/api/test_main.py` - updated fixtures and tests to use ResultsStorage
+- **Tests**: 89 tests pass (34 new storage tests + 30 job tests + 25 main tests), 84.24% API module coverage
+- **Build**: ruff: pass, mypy: pass
 - **Branch**: feature/5.1-web-api
-- **Notes**: (any additional context)
+- **Notes**: Storage class is designed to be S3-compatible with future implementation. Metadata storage is available for extensibility. All tests use temporary directories to avoid filesystem side effects. Error handling covers missing files, permission issues, and JSON parsing errors.
 
 ---
 

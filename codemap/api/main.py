@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -30,15 +29,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Import here to avoid circular imports
     from codemap.api.jobs import JobManager
+    from codemap.api.storage import ResultsStorage
+    from codemap.config import load_config
 
-    # Create job manager with results directory
-    results_dir = Path("./results")
-    results_dir.mkdir(parents=True, exist_ok=True)
+    # Load configuration and create storage
+    config = load_config()
+    storage = ResultsStorage(config.results_dir)
+    logger.info("ResultsStorage initialized with base_dir: %s", config.results_dir)
 
-    job_manager = JobManager(results_dir)
+    # Create job manager
+    job_manager = JobManager(storage)
     set_job_manager(job_manager)
 
-    logger.info("Job manager initialized with results directory: %s", results_dir)
+    logger.info("JobManager initialized")
 
     yield
 
