@@ -34,8 +34,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Load configuration and create storage
     config = load_config()
-    storage = ResultsStorage(config.results_dir)
-    logger.info("ResultsStorage initialized with base_dir: %s", config.results_dir)
+
+    # Create appropriate storage backend based on configuration
+    if config.storage_type == "s3":
+        logger.info("Using S3 storage backend")
+        if not config.s3_bucket:
+            raise ValueError(
+                "S3 storage selected but s3_bucket is not configured. "
+                "Set s3_bucket in configuration or CODEMAP_S3_BUCKET environment variable."
+            )
+        from codemap.api.storage_s3 import S3Storage
+
+        storage = S3Storage(
+            bucket_name=config.s3_bucket,
+            prefix=config.s3_prefix,
+            region=config.s3_region,
+        )
+        logger.info(
+            "S3Storage initialized: bucket=%s, prefix=%s, region=%s",
+            config.s3_bucket,
+            config.s3_prefix,
+            config.s3_region,
+        )
+    else:
+        # Default to local storage
+        storage = ResultsStorage(config.results_dir)
+        logger.info("ResultsStorage initialized with base_dir: %s", config.results_dir)
 
     # Create job manager
     job_manager = JobManager(storage)

@@ -23,6 +23,10 @@ class CodeMapConfig:
     )
     include_tests: bool = True
     results_dir: Path = field(default_factory=lambda: Path.cwd() / "results")
+    storage_type: str = "local"  # "local" or "s3"
+    s3_bucket: str = ""  # S3 bucket name (required if storage_type is "s3")
+    s3_prefix: str = ""  # Optional S3 key prefix
+    s3_region: str = "us-west-2"  # AWS region
 
     def __post_init__(self) -> None:
         """Validate and normalize paths."""
@@ -100,6 +104,10 @@ def _create_config_from_dict(config_dict: dict[str, object]) -> CodeMapConfig:
         "exclude_patterns",
         "include_tests",
         "results_dir",
+        "storage_type",
+        "s3_bucket",
+        "s3_prefix",
+        "s3_region",
     }
     filtered_dict = {k: v for k, v in config_dict.items() if k in valid_fields}
 
@@ -112,4 +120,8 @@ def _create_config_from_dict(config_dict: dict[str, object]) -> CodeMapConfig:
         ),
         include_tests=filtered_dict.get("include_tests", True),  # type: ignore
         results_dir=filtered_dict.get("results_dir", Path.cwd() / "results"),  # type: ignore
+        storage_type=filtered_dict.get("storage_type", "local"),  # type: ignore
+        s3_bucket=filtered_dict.get("s3_bucket", ""),  # type: ignore
+        s3_prefix=filtered_dict.get("s3_prefix", ""),  # type: ignore
+        s3_region=filtered_dict.get("s3_region", "us-west-2"),  # type: ignore
     )
