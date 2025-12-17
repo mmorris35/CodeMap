@@ -8,7 +8,7 @@
  * @see https://www.jsonrpc.org/specification
  */
 export interface JSONRPCRequest {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: string | number | null;
   method: string;
   params?: unknown;
@@ -18,7 +18,7 @@ export interface JSONRPCRequest {
  * JSON-RPC 2.0 response object (success case)
  */
 export interface JSONRPCResponse<T = unknown> {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: string | number | null;
   result: T;
 }
@@ -36,7 +36,7 @@ export interface JSONRPCError {
  * JSON-RPC 2.0 response object (error case)
  */
 export interface JSONRPCErrorResponse {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: string | number | null;
   error: JSONRPCError;
 }
@@ -44,7 +44,9 @@ export interface JSONRPCErrorResponse {
 /**
  * Union of possible JSON-RPC responses
  */
-export type JSONRPCResponseType<T = unknown> = JSONRPCResponse<T> | JSONRPCErrorResponse;
+export type JSONRPCResponseType<T = unknown> =
+  | JSONRPCResponse<T>
+  | JSONRPCErrorResponse;
 
 /**
  * MCP server capabilities
@@ -114,7 +116,7 @@ export interface ResourcesListResponse {
  * Tool call result
  */
 export interface ToolContent {
-  type: 'text' | 'image' | 'resource';
+  type: "text" | "image" | "resource";
   text?: string;
   data?: string;
   mimeType?: string;

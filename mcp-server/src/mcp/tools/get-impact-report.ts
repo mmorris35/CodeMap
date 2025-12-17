@@ -4,14 +4,14 @@
  * Calculates risk scores, identifies affected files, and suggests tests
  */
 
-import type { CodeMapStorage, Symbol } from '../../storage';
-import { getDependents } from './get-dependents';
-import type { ToolCallResponse } from '../types';
+import type { CodeMapStorage, Symbol } from "../../storage";
+import { getDependents } from "./get-dependents";
+import type { ToolCallResponse } from "../types";
 
 /**
  * Risk levels based on risk score
  */
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /**
  * Result structure for get_impact_report tool
@@ -49,7 +49,7 @@ export interface ImpactReport {
 function calculateRiskScore(
   directCount: number,
   transitiveCount: number,
-  fileCount: number
+  fileCount: number,
 ): number {
   const score = directCount * 10 + transitiveCount * 3 + fileCount * 5;
   return Math.min(100, score);
@@ -62,10 +62,10 @@ function calculateRiskScore(
  * @returns Risk level
  */
 export function getRiskLevel(riskScore: number): RiskLevel {
-  if (riskScore < 25) return 'LOW';
-  if (riskScore < 50) return 'MEDIUM';
-  if (riskScore < 75) return 'HIGH';
-  return 'CRITICAL';
+  if (riskScore < 25) return "LOW";
+  if (riskScore < 50) return "MEDIUM";
+  if (riskScore < 75) return "HIGH";
+  return "CRITICAL";
 }
 
 /**
@@ -75,10 +75,14 @@ export function getRiskLevel(riskScore: number): RiskLevel {
  * @returns True if file appears to be a test file
  */
 function isTestFile(filePath: string): boolean {
-  const fileName = filePath.split('/').pop() || '';
-  return fileName.startsWith('test_') || fileName.endsWith('_test.ts') ||
-    fileName.endsWith('_test.js') || fileName.endsWith('.test.ts') ||
-    fileName.endsWith('.test.js');
+  const fileName = filePath.split("/").pop() || "";
+  return (
+    fileName.startsWith("test_") ||
+    fileName.endsWith("_test.ts") ||
+    fileName.endsWith("_test.js") ||
+    fileName.endsWith(".test.ts") ||
+    fileName.endsWith(".test.js")
+  );
 }
 
 /**
@@ -101,7 +105,9 @@ function extractUniqueFiles(symbols: Array<{ file: string }>): string[] {
  * @param symbols - Array of symbols with file information
  * @returns Record mapping file paths to count of affected symbols
  */
-function createFileSummary(symbols: Array<{ file: string }>): Record<string, number> {
+function createFileSummary(
+  symbols: Array<{ file: string }>,
+): Record<string, number> {
   const summary: Record<string, number> = {};
   for (const sym of symbols) {
     summary[sym.file] = (summary[sym.file] || 0) + 1;
@@ -120,7 +126,7 @@ function createFileSummary(symbols: Array<{ file: string }>): Record<string, num
 function findTestFiles(
   affectedFiles: string[],
   allSymbols: Symbol[],
-  includeTests: boolean
+  includeTests: boolean,
 ): string[] {
   if (!includeTests) {
     return [];
@@ -131,7 +137,11 @@ function findTestFiles(
   // For each affected file, look for corresponding test files
   for (const affectedFile of affectedFiles) {
     // Extract the base name (e.g., 'api' from 'src/api.ts')
-    const baseName = affectedFile.replace(/\.[^.]+$/, '').split('/').pop() || '';
+    const baseName =
+      affectedFile
+        .replace(/\.[^.]+$/, "")
+        .split("/")
+        .pop() || "";
 
     // Find all test files that match this base name
     for (const symbol of allSymbols) {
@@ -162,12 +172,14 @@ function generateSummary(
   directCount: number,
   transitiveCount: number,
   fileCount: number,
-  riskLevel: RiskLevel
+  riskLevel: RiskLevel,
 ): string {
   const totalCount = directCount + transitiveCount;
-  return `Changing ${symbol} is ${riskLevel} risk. ` +
+  return (
+    `Changing ${symbol} is ${riskLevel} risk. ` +
     `Affects ${totalCount} function(s) (${directCount} direct, ${transitiveCount} transitive) ` +
-    `across ${fileCount} file(s).`;
+    `across ${fileCount} file(s).`
+  );
 }
 
 /**
@@ -186,7 +198,7 @@ export async function getImpactReport(
   userId: string,
   projectId: string,
   symbol: string,
-  includeTests: boolean = true
+  includeTests: boolean = true,
 ): Promise<ImpactReport> {
   // Get dependents using the existing tool
   const dependents = await getDependents(storage, userId, projectId, symbol);
@@ -209,13 +221,23 @@ export async function getImpactReport(
   const riskLevel = getRiskLevel(riskScore);
 
   // Find suggested test files
-  const suggestedTests = findTestFiles(affectedFiles, codeMap.symbols, includeTests);
+  const suggestedTests = findTestFiles(
+    affectedFiles,
+    codeMap.symbols,
+    includeTests,
+  );
 
   // Create file summary
   const fileSummary = createFileSummary(allAffectedSymbols);
 
   // Generate summary text
-  const summaryText = generateSummary(symbol, directCount, transitiveCount, fileCount, riskLevel);
+  const summaryText = generateSummary(
+    symbol,
+    directCount,
+    transitiveCount,
+    fileCount,
+    riskLevel,
+  );
 
   return {
     symbol,
@@ -241,7 +263,7 @@ export async function getImpactReport(
 export async function handleGetImpactReport(
   storage: CodeMapStorage,
   userId: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<ToolCallResponse> {
   try {
     // Validate required arguments
@@ -249,24 +271,24 @@ export async function handleGetImpactReport(
     const symbol = args.symbol;
     const includeTests = args.include_tests;
 
-    if (typeof projectId !== 'string' || !projectId.trim()) {
+    if (typeof projectId !== "string" || !projectId.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: project_id must be a non-empty string',
+            type: "text",
+            text: "Error: project_id must be a non-empty string",
           },
         ],
         isError: true,
       };
     }
 
-    if (typeof symbol !== 'string' || !symbol.trim()) {
+    if (typeof symbol !== "string" || !symbol.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: symbol must be a non-empty string',
+            type: "text",
+            text: "Error: symbol must be a non-empty string",
           },
         ],
         isError: true,
@@ -275,12 +297,12 @@ export async function handleGetImpactReport(
 
     let includeTestsFlag = true;
     if (includeTests !== undefined) {
-      if (typeof includeTests !== 'boolean') {
+      if (typeof includeTests !== "boolean") {
         return {
           content: [
             {
-              type: 'text',
-              text: 'Error: include_tests must be a boolean',
+              type: "text",
+              text: "Error: include_tests must be a boolean",
             },
           ],
           isError: true,
@@ -295,7 +317,7 @@ export async function handleGetImpactReport(
       userId,
       projectId,
       symbol,
-      includeTestsFlag
+      includeTestsFlag,
     );
 
     // Format response as JSON
@@ -304,7 +326,7 @@ export async function handleGetImpactReport(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: responseText,
         },
       ],
@@ -314,7 +336,7 @@ export async function handleGetImpactReport(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Error: ${errorMessage}`,
         },
       ],

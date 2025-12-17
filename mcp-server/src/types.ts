@@ -13,14 +13,14 @@ export type Bindings = {
   /** API key for authentication (derived from environment) */
   API_KEY: string;
   /** Environment name: 'development' or 'production' */
-  ENVIRONMENT: 'development' | 'production';
+  ENVIRONMENT: "development" | "production";
 };
 
 /**
  * MCP Request object following JSON-RPC 2.0 specification
  */
 export type MCPRequest = {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: string | number;
   method: string;
   params?: Record<string, unknown>;
@@ -30,7 +30,7 @@ export type MCPRequest = {
  * MCP Response object following JSON-RPC 2.0 specification
  */
 export type MCPResponse = {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: string | number;
   result?: unknown;
   error?: {
@@ -44,9 +44,9 @@ export type MCPResponse = {
  * Health check response
  */
 export type HealthResponse = {
-  status: 'healthy' | 'not_ready';
+  status: "healthy" | "not_ready";
   timestamp: string;
-  kv?: 'connected' | 'disconnected';
+  kv?: "connected" | "disconnected";
   environment?: string;
 };
 

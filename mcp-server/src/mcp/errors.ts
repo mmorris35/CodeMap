@@ -44,7 +44,7 @@ export const SERVER_ERROR_MAX = -32000;
  */
 export function createError(code: number, message: string, data?: unknown) {
   return {
-    jsonrpc: '2.0' as const,
+    jsonrpc: "2.0" as const,
     error: { code, message, data },
   };
 }
@@ -53,14 +53,14 @@ export function createError(code: number, message: string, data?: unknown) {
  * Helper function to create a parse error response
  */
 export function createParseError(data?: unknown) {
-  return createError(PARSE_ERROR_CODE, 'Parse error', data);
+  return createError(PARSE_ERROR_CODE, "Parse error", data);
 }
 
 /**
  * Helper function to create an invalid request response
  */
 export function createInvalidRequest(data?: unknown) {
-  return createError(INVALID_REQUEST_CODE, 'Invalid request', data);
+  return createError(INVALID_REQUEST_CODE, "Invalid request", data);
 }
 
 /**

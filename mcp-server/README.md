@@ -29,17 +29,20 @@ CodeMap MCP Server exposes CODE_MAP.json dependency data as MCP tools, allowing 
 ### Setup
 
 1. Install dependencies:
+
 ```bash
 cd mcp-server
 npm install
 ```
 
 2. Create `.dev.vars` from example:
+
 ```bash
 cp .dev.vars.example .dev.vars
 ```
 
 3. Update `.dev.vars` with your API key:
+
 ```bash
 API_KEY=your-dev-api-key
 ENVIRONMENT=development
@@ -48,6 +51,7 @@ ENVIRONMENT=development
 ### Running Locally
 
 Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -55,11 +59,13 @@ npm run dev
 The worker runs at `http://localhost:8787`
 
 Test it:
+
 ```bash
 curl http://localhost:8787/health
 ```
 
 Response:
+
 ```json
 {
   "status": "healthy",
@@ -70,11 +76,13 @@ Response:
 ### Building
 
 Compile TypeScript:
+
 ```bash
 npm run build
 ```
 
 Type check without building:
+
 ```bash
 npm run typecheck
 ```
@@ -82,11 +90,13 @@ npm run typecheck
 ### Testing
 
 Run test suite:
+
 ```bash
 npm test
 ```
 
 With coverage report:
+
 ```bash
 npm run test:coverage
 ```
@@ -123,11 +133,13 @@ mcp-server/
 ### Health Check
 
 **GET /health**
+
 ```bash
 curl http://localhost:8787/health
 ```
 
 Response:
+
 ```json
 {
   "status": "healthy",
@@ -138,11 +150,13 @@ Response:
 ### API Info
 
 **GET /**
+
 ```bash
 curl http://localhost:8787/
 ```
 
 Response:
+
 ```json
 {
   "name": "CodeMap MCP Server",
@@ -163,6 +177,7 @@ Send JSON-RPC 2.0 requests following the MCP specification. See [MCP Protocol Im
 **POST /projects/{project_id}/code_map**
 
 Upload a CODE_MAP.json file:
+
 ```bash
 curl -X POST \
   -H "Authorization: Bearer your-api-key" \
@@ -176,6 +191,7 @@ curl -X POST \
 The server implements JSON-RPC 2.0 for MCP protocol compliance.
 
 ### Request Format
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -186,6 +202,7 @@ The server implements JSON-RPC 2.0 for MCP protocol compliance.
 ```
 
 ### Response Format
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -250,6 +267,7 @@ Key configuration options:
 ## TypeScript Configuration
 
 The project uses TypeScript strict mode:
+
 - `strict: true` - All strict type checking options enabled
 - `noUnusedLocals: true` - Error on unused variables
 - `noUnusedParameters: true` - Error on unused parameters
@@ -265,6 +283,7 @@ The project uses TypeScript strict mode:
 ## Limits
 
 Cloudflare Workers has limits:
+
 - **Memory**: 128MB
 - **CPU Time**: 30s (paid) / 10ms (free)
 - **KV Value Size**: 25MB per entry
@@ -277,6 +296,7 @@ All requests must complete within CPU time limits.
 ### Port already in use
 
 If port 8787 is already in use:
+
 ```bash
 npm run dev -- --port 8788
 ```
@@ -284,6 +304,7 @@ npm run dev -- --port 8788
 ### KV Namespace not found
 
 Ensure KV namespace is created and ID matches in `wrangler.toml`:
+
 ```bash
 wrangler kv:namespace list
 ```
@@ -291,6 +312,7 @@ wrangler kv:namespace list
 ### TypeScript errors
 
 Run type checking:
+
 ```bash
 npm run typecheck
 ```
@@ -300,6 +322,7 @@ Fix any issues before deploying.
 ### Tests failing
 
 Run tests with verbose output:
+
 ```bash
 npm test -- --reporter=verbose
 ```
@@ -320,6 +343,7 @@ npm test -- --reporter=verbose
 ## Contributing
 
 When adding new features:
+
 1. Create a branch: `git checkout -b feature/description`
 2. Write TypeScript with strict mode compliance
 3. Add tests for all new functionality

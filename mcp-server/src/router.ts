@@ -3,13 +3,13 @@
  * Configures all middleware and routes for the Cloudflare Worker
  */
 
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 
-import type { Bindings, HealthResponse, APIInfoResponse } from './types';
-import { handleMcpRequest } from './mcp/handler';
-import { CodeMapStorage } from './storage';
+import type { Bindings, HealthResponse, APIInfoResponse } from "./types";
+import { handleMcpRequest } from "./mcp/handler";
+import { CodeMapStorage } from "./storage";
 
 /**
  * Create and configure the Hono application
@@ -21,13 +21,13 @@ export const app = new Hono<{ Bindings: Bindings }>();
  * CORS middleware - allow all origins for MCP clients
  * MCP clients may come from various domains, so we enable CORS globally
  */
-app.use('*', cors());
+app.use("*", cors());
 
 /**
  * Request logging middleware
  * Logs all incoming requests in dev console
  */
-app.use('*', logger());
+app.use("*", logger());
 
 /**
  * Error handling middleware
@@ -35,7 +35,7 @@ app.use('*', logger());
  */
 app.onError((err, c) => {
   const status = (err as { status?: number }).status || 500;
-  const message = err.message || 'Internal server error';
+  const message = err.message || "Internal server error";
 
   return c.json(
     {
@@ -44,7 +44,7 @@ app.onError((err, c) => {
         message: message,
       },
     },
-    status as any
+    status as any,
   );
 });
 
@@ -54,11 +54,11 @@ app.onError((err, c) => {
  *
  * @returns API info with version and available endpoints
  */
-app.get('/', (c) => {
+app.get("/", (c) => {
   const response: APIInfoResponse = {
-    name: 'CodeMap MCP Server',
-    version: '1.0.0',
-    endpoints: ['/health', '/health/ready', '/mcp', '/projects'],
+    name: "CodeMap MCP Server",
+    version: "1.0.0",
+    endpoints: ["/health", "/health/ready", "/mcp", "/projects"],
     environment: c.env.ENVIRONMENT,
   };
   return c.json(response);
@@ -70,9 +70,9 @@ app.get('/', (c) => {
  *
  * @returns Health status and current timestamp
  */
-app.get('/health', (c) => {
+app.get("/health", (c) => {
   const response: HealthResponse = {
-    status: 'healthy',
+    status: "healthy",
     timestamp: new Date().toISOString(),
     environment: c.env.ENVIRONMENT,
   };
@@ -86,23 +86,23 @@ app.get('/health', (c) => {
  *
  * @returns Ready status if all checks pass, or error if dependencies unavailable
  */
-app.get('/health/ready', async (c) => {
+app.get("/health/ready", async (c) => {
   try {
     // Test KV connectivity by attempting a simple operation
-    await c.env.CODEMAP_KV.get('__health_check__');
+    await c.env.CODEMAP_KV.get("__health_check__");
 
     const response: HealthResponse = {
-      status: 'healthy',
+      status: "healthy",
       timestamp: new Date().toISOString(),
-      kv: 'connected',
+      kv: "connected",
       environment: c.env.ENVIRONMENT,
     };
     return c.json(response);
   } catch (error) {
     const response: HealthResponse = {
-      status: 'not_ready',
+      status: "not_ready",
       timestamp: new Date().toISOString(),
-      kv: 'disconnected',
+      kv: "disconnected",
       environment: c.env.ENVIRONMENT,
     };
     return c.json(response, 503);
@@ -115,13 +115,13 @@ app.get('/health/ready', async (c) => {
  *
  * @returns JSON-RPC 2.0 response
  */
-app.post('/mcp', async (c) => {
+app.post("/mcp", async (c) => {
   try {
     // Get request body
     const body = await c.req.text();
 
     // For now, use a placeholder user ID (will be derived from API key in subtask 6.3.1)
-    const userId = 'anonymous';
+    const userId = "anonymous";
 
     // Create storage instance
     const storage = new CodeMapStorage(c.env.CODEMAP_KV);
@@ -136,28 +136,28 @@ app.post('/mcp', async (c) => {
     if (error instanceof SyntaxError) {
       return c.json(
         {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           id: null,
           error: {
             code: -32700,
-            message: 'Parse error',
+            message: "Parse error",
           },
         },
-        400
+        400,
       );
     }
 
     // Return internal error for other exceptions
     return c.json(
       {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id: null,
         error: {
           code: -32603,
-          message: 'Internal error',
+          message: "Internal error",
         },
       },
-      500
+      500,
     );
   }
 });

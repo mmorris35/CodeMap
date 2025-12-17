@@ -3,8 +3,8 @@
  * Analyzes dependency graph to find all symbols that depend on (call) a given symbol
  */
 
-import type { CodeMapStorage, Dependency } from '../../storage';
-import type { ToolCallResponse } from '../types';
+import type { CodeMapStorage, Dependency } from "../../storage";
+import type { ToolCallResponse } from "../types";
 
 /**
  * Result structure for get_dependents tool
@@ -43,7 +43,7 @@ export async function getDependents(
   userId: string,
   projectId: string,
   symbol: string,
-  depth?: number
+  depth?: number,
 ): Promise<GetDependentsResult> {
   // Load CodeMap from storage
   const codeMap = await storage.getCodeMap(userId, projectId);
@@ -59,7 +59,10 @@ export async function getDependents(
 
   // Build reverse dependency map (who calls whom)
   // Map from "to_sym" (callee) to list of "from_sym" (callers)
-  const callersMap = new Map<string, Array<{ symbol: string; dependency: Dependency }>>();
+  const callersMap = new Map<
+    string,
+    Array<{ symbol: string; dependency: Dependency }>
+  >();
   for (const dep of codeMap.dependencies) {
     if (!callersMap.has(dep.to_sym)) {
       callersMap.set(dep.to_sym, []);
@@ -82,7 +85,10 @@ export async function getDependents(
 
   // Continue traversal if depth is unlimited (undefined) or if we haven't reached the limit
   // depth=0 or undefined means unlimited; depth=1 means only direct; depth=2 means one level of transitive, etc.
-  while (queue.length > 0 && (depth === undefined || depth === 0 || currentDepth < depth)) {
+  while (
+    queue.length > 0 &&
+    (depth === undefined || depth === 0 || currentDepth < depth)
+  ) {
     const levelSize = queue.length;
 
     for (let i = 0; i < levelSize; i++) {
@@ -109,7 +115,7 @@ export async function getDependents(
     const sym = symbolMap.get(item.symbol);
     return {
       symbol: item.symbol,
-      file: sym?.file || 'unknown',
+      file: sym?.file || "unknown",
       line: sym?.line || 0,
     };
   });
@@ -118,7 +124,7 @@ export async function getDependents(
     const s = symbolMap.get(sym);
     return {
       symbol: sym,
-      file: s?.file || 'unknown',
+      file: s?.file || "unknown",
       line: s?.line || 0,
     };
   });
@@ -142,7 +148,7 @@ export async function getDependents(
 export async function handleGetDependents(
   storage: CodeMapStorage,
   userId: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<ToolCallResponse> {
   try {
     // Validate required arguments
@@ -150,24 +156,24 @@ export async function handleGetDependents(
     const symbol = args.symbol;
     const depthArg = args.depth;
 
-    if (typeof projectId !== 'string' || !projectId.trim()) {
+    if (typeof projectId !== "string" || !projectId.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: project_id must be a non-empty string',
+            type: "text",
+            text: "Error: project_id must be a non-empty string",
           },
         ],
         isError: true,
       };
     }
 
-    if (typeof symbol !== 'string' || !symbol.trim()) {
+    if (typeof symbol !== "string" || !symbol.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: symbol must be a non-empty string',
+            type: "text",
+            text: "Error: symbol must be a non-empty string",
           },
         ],
         isError: true,
@@ -176,12 +182,12 @@ export async function handleGetDependents(
 
     let depth: number | undefined;
     if (depthArg !== undefined) {
-      if (typeof depthArg !== 'number' || depthArg < 0) {
+      if (typeof depthArg !== "number" || depthArg < 0) {
         return {
           content: [
             {
-              type: 'text',
-              text: 'Error: depth must be a non-negative number',
+              type: "text",
+              text: "Error: depth must be a non-negative number",
             },
           ],
           isError: true,
@@ -191,7 +197,13 @@ export async function handleGetDependents(
     }
 
     // Call the tool implementation
-    const result = await getDependents(storage, userId, projectId, symbol, depth);
+    const result = await getDependents(
+      storage,
+      userId,
+      projectId,
+      symbol,
+      depth,
+    );
 
     // Format response as JSON
     const responseText = JSON.stringify(result, null, 2);
@@ -199,7 +211,7 @@ export async function handleGetDependents(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: responseText,
         },
       ],
@@ -209,7 +221,7 @@ export async function handleGetDependents(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Error: ${errorMessage}`,
         },
       ],

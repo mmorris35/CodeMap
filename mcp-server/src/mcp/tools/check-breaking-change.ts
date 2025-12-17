@@ -4,9 +4,9 @@
  * Analyzes parameter changes and identifies affected callers
  */
 
-import type { CodeMapStorage } from '../../storage';
-import { getDependents, type GetDependentsResult } from './get-dependents';
-import type { ToolCallResponse } from '../types';
+import type { CodeMapStorage } from "../../storage";
+import { getDependents, type GetDependentsResult } from "./get-dependents";
+import type { ToolCallResponse } from "../types";
 
 /**
  * Parameter information extracted from a signature
@@ -68,18 +68,18 @@ function extractParameters(signature: string): ParameterInfo[] {
 
   // Split by comma, but be careful of nested structures
   let depth = 0;
-  let current = '';
+  let current = "";
 
   for (const char of paramString) {
-    if (char === '[' || char === '{' || char === '<') {
+    if (char === "[" || char === "{" || char === "<") {
       depth++;
-    } else if (char === ']' || char === '}' || char === '>') {
+    } else if (char === "]" || char === "}" || char === ">") {
       depth--;
-    } else if (char === ',' && depth === 0) {
+    } else if (char === "," && depth === 0) {
       if (current.trim()) {
         parameters.push(parseParameter(current.trim()));
       }
-      current = '';
+      current = "";
       continue;
     }
     current += char;
@@ -103,12 +103,12 @@ function parseParameter(paramString: string): ParameterInfo {
   paramString = paramString.trim();
 
   // Skip *args, **kwargs, etc.
-  if (paramString.startsWith('*') || paramString.startsWith('...')) {
+  if (paramString.startsWith("*") || paramString.startsWith("...")) {
     return {
       name: paramString,
       isRequired: false,
       hasDefaultValue: true,
-      type: 'variadic',
+      type: "variadic",
     };
   }
 
@@ -117,8 +117,8 @@ function parseParameter(paramString: string): ParameterInfo {
   const name = nameMatch ? nameMatch[1] : paramString;
 
   // Check if parameter is optional (has ? or default value)
-  const hasQuestionMark = paramString.includes('?');
-  const hasDefaultValue = paramString.includes('=') || hasQuestionMark;
+  const hasQuestionMark = paramString.includes("?");
+  const hasDefaultValue = paramString.includes("=") || hasQuestionMark;
 
   // Extract type if present
   const typeMatch = paramString.match(/:\s*([^=]+)(?:=|$)/);
@@ -152,7 +152,7 @@ function parseParameter(paramString: string): ParameterInfo {
  */
 function analyzeSignatureChange(
   oldSignature: string | null,
-  newSignature: string
+  newSignature: string,
 ): SignatureAnalysis {
   const details: string[] = [];
 
@@ -162,7 +162,7 @@ function analyzeSignatureChange(
     return {
       isBreaking: false,
       reason: null,
-      details: ['New symbol, no previous signature to compare'],
+      details: ["New symbol, no previous signature to compare"],
     };
   }
 
@@ -174,9 +174,7 @@ function analyzeSignatureChange(
     if (oldParam.isRequired) {
       const newParam = newParams.find((p) => p.name === oldParam.name);
       if (!newParam) {
-        details.push(
-          `Required parameter '${oldParam.name}' was removed`
-        );
+        details.push(`Required parameter '${oldParam.name}' was removed`);
         return {
           isBreaking: true,
           reason: `Required parameter '${oldParam.name}' was removed`,
@@ -188,8 +186,8 @@ function analyzeSignatureChange(
 
   // Check if new required parameters were added before variadic parameters
   // Filter out variadic params for proper comparison
-  const oldRegularParams = oldParams.filter((p) => p.type !== 'variadic');
-  const newRegularParams = newParams.filter((p) => p.type !== 'variadic');
+  const oldRegularParams = oldParams.filter((p) => p.type !== "variadic");
+  const newRegularParams = newParams.filter((p) => p.type !== "variadic");
 
   // Check if required parameters were added in new signature
   for (let i = oldRegularParams.length; i < newRegularParams.length; i++) {
@@ -197,7 +195,7 @@ function analyzeSignatureChange(
     if (newParam.isRequired) {
       // New required parameter added (breaking)
       details.push(
-        `New required parameter '${newParam.name}' added at position ${i}`
+        `New required parameter '${newParam.name}' added at position ${i}`,
       );
       return {
         isBreaking: true,
@@ -216,7 +214,7 @@ function analyzeSignatureChange(
     // If parameter names differ at the same position, and old param was required
     if (oldParam.name !== newParam.name && oldParam.isRequired) {
       details.push(
-        `Parameter at position ${i} changed from '${oldParam.name}' to '${newParam.name}'`
+        `Parameter at position ${i} changed from '${oldParam.name}' to '${newParam.name}'`,
       );
       return {
         isBreaking: true,
@@ -239,7 +237,7 @@ function analyzeSignatureChange(
     ) {
       // Type change detected
       details.push(
-        `Type of parameter '${oldParam.name}' changed from '${oldParam.type}' to '${newParam.type}'`
+        `Type of parameter '${oldParam.name}' changed from '${oldParam.type}' to '${newParam.type}'`,
       );
       // Note: Not always breaking (could be compatible type), but flag for review
       return {
@@ -254,7 +252,7 @@ function analyzeSignatureChange(
   return {
     isBreaking: false,
     reason: null,
-    details: ['Signature change appears backward compatible'],
+    details: ["Signature change appears backward compatible"],
   };
 }
 
@@ -278,7 +276,7 @@ export async function checkBreakingChange(
   userId: string,
   projectId: string,
   symbol: string,
-  newSignature: string
+  newSignature: string,
 ): Promise<BreakingChangeResult> {
   // Load CodeMap from storage
   const codeMap = await storage.getCodeMap(userId, projectId);
@@ -293,7 +291,8 @@ export async function checkBreakingChange(
   }
 
   // Get the old signature (preserve empty string as distinct from null)
-  const oldSignature = symbolData.signature !== undefined ? symbolData.signature : null;
+  const oldSignature =
+    symbolData.signature !== undefined ? symbolData.signature : null;
 
   // Analyze if the change is breaking
   const analysis = analyzeSignatureChange(oldSignature, newSignature);
@@ -306,7 +305,7 @@ export async function checkBreakingChange(
       userId,
       projectId,
       symbol,
-      undefined
+      undefined,
     );
   } catch {
     // If symbol has no dependents, that's okay
@@ -329,15 +328,16 @@ export async function checkBreakingChange(
   const safeCallers = analysis.isBreaking ? [] : allCallers;
 
   // Generate suggestion
-  let suggestion = '';
+  let suggestion = "";
   if (analysis.isBreaking) {
     if (allCallers.length === 0) {
-      suggestion = 'This change is breaking, but there are no known callers.';
+      suggestion = "This change is breaking, but there are no known callers.";
     } else {
       suggestion = `This change is breaking. Update ${allCallers.length} caller(s) before applying this change.`;
     }
   } else {
-    suggestion = 'This change appears backward compatible for existing callers.';
+    suggestion =
+      "This change appears backward compatible for existing callers.";
   }
 
   return {
@@ -363,7 +363,7 @@ export async function checkBreakingChange(
 export async function handleCheckBreakingChange(
   storage: CodeMapStorage,
   userId: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<ToolCallResponse> {
   try {
     // Validate required arguments
@@ -371,36 +371,36 @@ export async function handleCheckBreakingChange(
     const symbol = args.symbol;
     const newSignature = args.new_signature;
 
-    if (typeof projectId !== 'string' || !projectId.trim()) {
+    if (typeof projectId !== "string" || !projectId.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: project_id must be a non-empty string',
+            type: "text",
+            text: "Error: project_id must be a non-empty string",
           },
         ],
         isError: true,
       };
     }
 
-    if (typeof symbol !== 'string' || !symbol.trim()) {
+    if (typeof symbol !== "string" || !symbol.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: symbol must be a non-empty string',
+            type: "text",
+            text: "Error: symbol must be a non-empty string",
           },
         ],
         isError: true,
       };
     }
 
-    if (typeof newSignature !== 'string' || !newSignature.trim()) {
+    if (typeof newSignature !== "string" || !newSignature.trim()) {
       return {
         content: [
           {
-            type: 'text',
-            text: 'Error: new_signature must be a non-empty string',
+            type: "text",
+            text: "Error: new_signature must be a non-empty string",
           },
         ],
         isError: true,
@@ -413,7 +413,7 @@ export async function handleCheckBreakingChange(
       userId,
       projectId,
       symbol,
-      newSignature
+      newSignature,
     );
 
     // Format response as JSON
@@ -422,7 +422,7 @@ export async function handleCheckBreakingChange(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: responseText,
         },
       ],
@@ -432,7 +432,7 @@ export async function handleCheckBreakingChange(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Error: ${errorMessage}`,
         },
       ],

@@ -11,23 +11,24 @@ import type {
   ResourcesListResponse,
   Tool,
   Resource,
-} from './types';
+} from "./types";
 import {
   METHOD_NOT_FOUND_CODE,
   createParseError,
   createInvalidRequest,
-} from './errors';
-import type { CodeMapStorage } from '../storage';
-import { handleGetDependents } from './tools/get-dependents';
-import { handleGetImpactReport } from './tools/get-impact-report';
-import { handleCheckBreakingChange } from './tools/check-breaking-change';
+} from "./errors";
+import type { CodeMapStorage } from "../storage";
+import { handleGetDependents } from "./tools/get-dependents";
+import { handleGetImpactReport } from "./tools/get-impact-report";
+import { handleCheckBreakingChange } from "./tools/check-breaking-change";
+import { handleGetArchitecture } from "./tools/get-architecture";
 
 /**
  * Server information
  */
 const SERVER_INFO = {
-  name: 'codemap-mcp',
-  version: '1.0.0',
+  name: "codemap-mcp",
+  version: "1.0.0",
 };
 
 /**
@@ -36,88 +37,97 @@ const SERVER_INFO = {
  */
 const TOOLS: Tool[] = [
   {
-    name: 'get_dependents',
-    description: 'Get all functions/methods that depend on (call) a specified symbol. Returns both direct callers and transitive dependents.',
+    name: "get_dependents",
+    description:
+      "Get all functions/methods that depend on (call) a specified symbol. Returns both direct callers and transitive dependents.",
     inputSchema: {
-      type: 'object',
+      type: "object",
       properties: {
         project_id: {
-          type: 'string',
-          description: 'The project ID containing the symbol',
+          type: "string",
+          description: "The project ID containing the symbol",
         },
         symbol: {
-          type: 'string',
-          description: 'Fully qualified symbol name (e.g., "auth.validate_token")',
+          type: "string",
+          description:
+            'Fully qualified symbol name (e.g., "auth.validate_token")',
         },
         depth: {
-          type: 'number',
-          description: 'Optional maximum traversal depth for transitive dependents (default: unlimited)',
+          type: "number",
+          description:
+            "Optional maximum traversal depth for transitive dependents (default: unlimited)",
         },
       },
-      required: ['project_id', 'symbol'],
+      required: ["project_id", "symbol"],
     },
   },
   {
-    name: 'get_impact_report',
-    description: 'Get a comprehensive impact analysis for changing a symbol. Includes risk scoring, affected files, and suggested tests.',
+    name: "get_impact_report",
+    description:
+      "Get a comprehensive impact analysis for changing a symbol. Includes risk scoring, affected files, and suggested tests.",
     inputSchema: {
-      type: 'object',
+      type: "object",
       properties: {
         project_id: {
-          type: 'string',
-          description: 'The project ID containing the symbol',
+          type: "string",
+          description: "The project ID containing the symbol",
         },
         symbol: {
-          type: 'string',
-          description: 'Fully qualified symbol name to analyze impact for',
+          type: "string",
+          description: "Fully qualified symbol name to analyze impact for",
         },
         include_tests: {
-          type: 'boolean',
-          description: 'Whether to include test files in impact analysis (default: true)',
+          type: "boolean",
+          description:
+            "Whether to include test files in impact analysis (default: true)",
         },
       },
-      required: ['project_id', 'symbol'],
+      required: ["project_id", "symbol"],
     },
   },
   {
-    name: 'check_breaking_change',
-    description: 'Check if a proposed signature change would break existing callers. Analyzes parameter changes and returns affected callers.',
+    name: "check_breaking_change",
+    description:
+      "Check if a proposed signature change would break existing callers. Analyzes parameter changes and returns affected callers.",
     inputSchema: {
-      type: 'object',
+      type: "object",
       properties: {
         project_id: {
-          type: 'string',
-          description: 'The project ID containing the symbol',
+          type: "string",
+          description: "The project ID containing the symbol",
         },
         symbol: {
-          type: 'string',
-          description: 'Fully qualified symbol name',
+          type: "string",
+          description: "Fully qualified symbol name",
         },
         new_signature: {
-          type: 'string',
-          description: 'The proposed new signature (e.g., "def validate(token: str, realm: str = None) -> bool")',
+          type: "string",
+          description:
+            'The proposed new signature (e.g., "def validate(token: str, realm: str = None) -> bool")',
         },
       },
-      required: ['project_id', 'symbol', 'new_signature'],
+      required: ["project_id", "symbol", "new_signature"],
     },
   },
   {
-    name: 'get_architecture',
-    description: 'Get high-level architecture overview of the codebase. Returns module/package structure, dependencies, and hotspots.',
+    name: "get_architecture",
+    description:
+      "Get high-level architecture overview of the codebase. Returns module/package structure, dependencies, and hotspots.",
     inputSchema: {
-      type: 'object',
+      type: "object",
       properties: {
         project_id: {
-          type: 'string',
-          description: 'The project ID to analyze',
+          type: "string",
+          description: "The project ID to analyze",
         },
         level: {
-          type: 'string',
-          enum: ['module', 'package'],
-          description: 'Aggregation level for architecture view (default: module)',
+          type: "string",
+          enum: ["module", "package"],
+          description:
+            "Aggregation level for architecture view (default: module)",
         },
       },
-      required: ['project_id'],
+      required: ["project_id"],
     },
   },
 ];
@@ -127,10 +137,10 @@ const TOOLS: Tool[] = [
  */
 const RESOURCES: Resource[] = [
   {
-    uri: 'codemap://project',
-    name: 'Project CodeMap',
-    description: 'The CODE_MAP.json for the currently analyzed project',
-    mimeType: 'application/json',
+    uri: "codemap://project",
+    name: "Project CodeMap",
+    description: "The CODE_MAP.json for the currently analyzed project",
+    mimeType: "application/json",
   },
 ];
 
@@ -146,18 +156,18 @@ const RESOURCES: Resource[] = [
 export async function handleMcpRequest(
   request: unknown,
   storage: CodeMapStorage,
-  userId: string
+  userId: string,
 ): Promise<JSONRPCResponseType> {
   let parsedRequest: JSONRPCRequest;
 
   // Parse request if it's a string
-  if (typeof request === 'string') {
+  if (typeof request === "string") {
     try {
       parsedRequest = JSON.parse(request);
     } catch {
       return createParseError() as JSONRPCResponseType;
     }
-  } else if (typeof request === 'object' && request !== null) {
+  } else if (typeof request === "object" && request !== null) {
     parsedRequest = request as JSONRPCRequest;
   } else {
     return createInvalidRequest() as JSONRPCResponseType;
@@ -176,21 +186,21 @@ export async function handleMcpRequest(
   try {
     // Route to appropriate handler
     switch (method) {
-      case 'initialize':
+      case "initialize":
         return handleInitialize(id);
 
-      case 'tools/list':
+      case "tools/list":
         return handleToolsList(id);
 
-      case 'tools/call':
+      case "tools/call":
         return await handleToolCall(id, params, storage, userId);
 
-      case 'resources/list':
+      case "resources/list":
         return handleResourcesList(id);
 
       default:
         return {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           id,
           error: {
             code: METHOD_NOT_FOUND_CODE,
@@ -199,9 +209,9 @@ export async function handleMcpRequest(
         };
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : "Unknown error";
     return {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id,
       error: {
         code: -32603, // Internal error
@@ -215,21 +225,24 @@ export async function handleMcpRequest(
  * Validate that a request is a properly formatted JSON-RPC 2.0 request
  */
 function isValidRequest(request: unknown): request is JSONRPCRequest {
-  if (typeof request !== 'object' || request === null) return false;
+  if (typeof request !== "object" || request === null) return false;
 
   const req = request as any;
 
   // Must have jsonrpc: '2.0'
-  if (req.jsonrpc !== '2.0') return false;
+  if (req.jsonrpc !== "2.0") return false;
 
   // Must have string or number id (null is not valid for request)
-  if (typeof req.id !== 'string' && typeof req.id !== 'number') return false;
+  if (typeof req.id !== "string" && typeof req.id !== "number") return false;
 
   // Must have string method
-  if (typeof req.method !== 'string') return false;
+  if (typeof req.method !== "string") return false;
 
   // Params must be object (excluding null) or undefined
-  if (req.params !== undefined && (typeof req.params !== 'object' || req.params === null)) {
+  if (
+    req.params !== undefined &&
+    (typeof req.params !== "object" || req.params === null)
+  ) {
     return false;
   }
 
@@ -242,7 +255,7 @@ function isValidRequest(request: unknown): request is JSONRPCRequest {
  */
 function handleInitialize(id: string | number | null): JSONRPCResponseType {
   const response: InitializeResponse = {
-    protocolVersion: '2024-11-05',
+    protocolVersion: "2024-11-05",
     capabilities: {
       tools: {},
       resources: {},
@@ -251,7 +264,7 @@ function handleInitialize(id: string | number | null): JSONRPCResponseType {
   };
 
   return {
-    jsonrpc: '2.0',
+    jsonrpc: "2.0",
     id,
     result: response,
   };
@@ -267,7 +280,7 @@ function handleToolsList(id: string | number | null): JSONRPCResponseType {
   };
 
   return {
-    jsonrpc: '2.0',
+    jsonrpc: "2.0",
     id,
     result: response,
   };
@@ -283,7 +296,7 @@ function handleResourcesList(id: string | number | null): JSONRPCResponseType {
   };
 
   return {
-    jsonrpc: '2.0',
+    jsonrpc: "2.0",
     id,
     result: response,
   };
@@ -297,15 +310,15 @@ async function handleToolCall(
   id: string | number | null,
   params: unknown,
   storage: CodeMapStorage,
-  userId: string
+  userId: string,
 ): Promise<JSONRPCResponseType> {
-  if (typeof params !== 'object' || params === null) {
+  if (typeof params !== "object" || params === null) {
     return {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id,
       error: {
         code: -32602,
-        message: 'Invalid params: expected object',
+        message: "Invalid params: expected object",
       },
     };
   }
@@ -313,9 +326,9 @@ async function handleToolCall(
   const toolParams = params as Record<string, unknown>;
   const toolName = toolParams.name;
 
-  if (typeof toolName !== 'string') {
+  if (typeof toolName !== "string") {
     return {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id,
       error: {
         code: -32602,
@@ -326,9 +339,9 @@ async function handleToolCall(
 
   const toolArgs = toolParams.arguments;
 
-  if (typeof toolArgs !== 'object' || toolArgs === null) {
+  if (typeof toolArgs !== "object" || toolArgs === null) {
     return {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id,
       error: {
         code: -32602,
@@ -341,36 +354,41 @@ async function handleToolCall(
   let result: unknown;
 
   switch (toolName) {
-    case 'get_dependents':
-      result = await handleGetDependents(storage, userId, toolArgs as Record<string, unknown>);
-      break;
-
-    case 'get_impact_report':
-      result = await handleGetImpactReport(storage, userId, toolArgs as Record<string, unknown>);
-      break;
-
-    case 'check_breaking_change':
-      result = await handleCheckBreakingChange(
+    case "get_dependents":
+      result = await handleGetDependents(
         storage,
         userId,
-        toolArgs as Record<string, unknown>
+        toolArgs as Record<string, unknown>,
       );
       break;
 
-    case 'get_architecture':
-      result = {
-        content: [
-          {
-            type: 'text',
-            text: 'get_architecture tool not yet implemented',
-          },
-        ],
-      };
+    case "get_impact_report":
+      result = await handleGetImpactReport(
+        storage,
+        userId,
+        toolArgs as Record<string, unknown>,
+      );
+      break;
+
+    case "check_breaking_change":
+      result = await handleCheckBreakingChange(
+        storage,
+        userId,
+        toolArgs as Record<string, unknown>,
+      );
+      break;
+
+    case "get_architecture":
+      result = await handleGetArchitecture(
+        storage,
+        userId,
+        toolArgs as Record<string, unknown>,
+      );
       break;
 
     default:
       return {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id,
         error: {
           code: -32601,
@@ -380,7 +398,7 @@ async function handleToolCall(
   }
 
   return {
-    jsonrpc: '2.0',
+    jsonrpc: "2.0",
     id,
     result,
   };
