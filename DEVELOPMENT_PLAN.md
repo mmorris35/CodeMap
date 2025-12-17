@@ -2131,15 +2131,15 @@ class DevPlanParser:
 - [x] 4.2.3: Example Project
 
 **Deliverables**:
-- [ ] Add `fastapi` and `uvicorn` to pyproject.toml dependencies
-- [ ] Create `codemap/api/__init__.py`
-- [ ] Create `codemap/api/main.py` with FastAPI app
-- [ ] Implement `GET /health` endpoint returning `{"status": "healthy"}`
-- [ ] Implement `POST /analyze` endpoint accepting `{"repo_url": "...", "branch": "main"}`
-- [ ] Implement `GET /results/{job_id}` endpoint for async result retrieval
-- [ ] Implement `GET /results/{job_id}/graph` returning Mermaid diagram
-- [ ] Add request validation with Pydantic models
-- [ ] Write test `tests/api/test_main.py`
+- [x] Add `fastapi` and `uvicorn` to pyproject.toml dependencies
+- [x] Create `codemap/api/__init__.py`
+- [x] Create `codemap/api/main.py` with FastAPI app
+- [x] Implement `GET /health` endpoint returning `{"status": "healthy"}`
+- [x] Implement `POST /analyze` endpoint accepting `{"repo_url": "...", "branch": "main"}`
+- [x] Implement `GET /results/{job_id}` endpoint for async result retrieval
+- [x] Implement `GET /results/{job_id}/graph` returning Mermaid diagram
+- [x] Add request validation with Pydantic models
+- [x] Write test `tests/api/test_main.py`
 
 **Technology Decisions**:
 - FastAPI for async support and automatic OpenAPI docs
@@ -2158,24 +2158,30 @@ class DevPlanParser:
 - `pyproject.toml`
 
 **Success Criteria**:
-- [ ] `uvicorn codemap.api.main:app` starts server on port 8000
-- [ ] `GET /health` returns 200 with JSON body
-- [ ] `GET /docs` shows Swagger UI
-- [ ] `POST /analyze` accepts repo URL and returns job_id
-- [ ] Request validation rejects invalid URLs
-- [ ] `pytest tests/api/ -v` passes
-- [ ] Type hints pass mypy
+- [x] `uvicorn codemap.api.main:app` starts server on port 8000
+- [x] `GET /health` returns 200 with JSON body
+- [x] `GET /docs` shows Swagger UI
+- [x] `POST /analyze` accepts repo URL and returns job_id
+- [x] Request validation rejects invalid URLs
+- [x] `pytest tests/api/ -v` passes
+- [x] Type hints pass mypy
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Built complete FastAPI application with Pydantic models for request/response validation. Implemented endpoints for health checks, job submission, status retrieval, and result retrieval (Mermaid diagrams and CODE_MAP.json). Added in-memory JobManager for job lifecycle management. All endpoints include comprehensive OpenAPI documentation.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `codemap/api/__init__.py` - 13 lines
+  - `codemap/api/main.py` - 96 lines
+  - `codemap/api/models.py` - 92 lines
+  - `codemap/api/routes.py` - 283 lines
+  - `codemap/api/jobs.py` - 152 lines
+  - `tests/api/__init__.py` - 3 lines
+  - `tests/api/test_main.py` - 500 lines
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: (ruff: pass/fail, mypy: pass/fail)
+  - `pyproject.toml` - added `api` optional dependency group with fastapi and uvicorn
+- **Tests**: 25 tests, 87% coverage (api module), 86% coverage (overall)
+- **Build**: ruff: pass, mypy: pass
 - **Branch**: feature/5.1-web-api
-- **Notes**: (any additional context)
+- **Notes**: Used lifespan context manager instead of deprecated on_event handlers. Timezone-aware datetime objects to avoid deprecation warnings. All endpoints follow REST conventions with proper HTTP status codes and error handling.
 
 ---
 
@@ -3451,20 +3457,192 @@ export async function getArchitecture(
 
 ---
 
-**Subtask 6.3.1: REST API for Project Upload (3-4 hours)**
+**Subtask 6.3.1: Auto-Registration and API Key Management (2-3 hours)**
 
 **Prerequisites**:
 - [x] 6.2.5: MCP Tool - get_architecture
 
 **Deliverables**:
-- [ ] Create `mcp-server/src/auth.ts` with API key validation and user ID derivation
+- [ ] Create `mcp-server/src/auth.ts` with API key generation and validation
+- [ ] Implement `POST /register` endpoint for automatic API key creation
+- [ ] Generate cryptographically secure API keys with `cm_` prefix
+- [ ] Store only key hash in KV (`apikey:{hash}` → metadata)
+- [ ] Return plain key ONCE to user (never stored or retrievable)
+- [ ] Implement daily registration rate limit (100/day on free tier)
+- [ ] Implement `getUserIdFromApiKey()` for deriving user namespace
+- [ ] Implement `validateApiKey()` to check key exists in KV
+- [ ] Write test `mcp-server/src/auth.test.ts`
+
+**Technology Decisions**:
+- **Zero-friction onboarding**: First request auto-creates API key
+- **Key format**: `cm_` prefix + 43 chars base62 (256 bits entropy)
+- **Storage**: Only SHA-256 hash stored, plain key returned once
+- **Rate limit**: 100 registrations/day on free tier (1k KV writes/day limit)
+- **User ID**: First 16 chars of key hash = user namespace
+
+**Skeleton Code** (`mcp-server/src/auth.ts`):
+```typescript
+import { z } from 'zod';
+
+// Generate secure API key
+export function generateApiKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const base62 = toBase62(bytes);
+  return `cm_${base62}`;
+}
+
+// Convert bytes to base62 string
+function toBase62(bytes: Uint8Array): string {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let result = '';
+  for (const byte of bytes) {
+    result += chars[byte % 62];
+  }
+  return result;
+}
+
+// Hash API key (one-way, for storage)
+export async function hashApiKey(apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(apiKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Derive user ID from API key (first 16 chars of hash)
+export async function getUserIdFromApiKey(apiKey: string): Promise<string> {
+  const hash = await hashApiKey(apiKey);
+  return hash.substring(0, 16);
+}
+
+// Validate API key exists in KV
+export async function validateApiKey(
+  kv: KVNamespace,
+  apiKey: string | undefined
+): Promise<{ valid: boolean; userId?: string }> {
+  if (!apiKey) return { valid: false };
+
+  const hash = await hashApiKey(apiKey);
+  const exists = await kv.get(`apikey:${hash}`);
+
+  if (!exists) return { valid: false };
+
+  return { valid: true, userId: hash.substring(0, 16) };
+}
+```
+
+**Skeleton Code** (`mcp-server/src/routes/register.ts`):
+```typescript
+import { Hono } from 'hono';
+import { generateApiKey, hashApiKey } from '../auth';
+
+const register = new Hono<{ Bindings: Bindings }>();
+
+// Rate limit: 100 registrations per day (free tier constraint)
+async function checkRateLimit(kv: KVNamespace): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const countKey = `ratelimit:register:${today}`;
+  const count = parseInt(await kv.get(countKey) || '0');
+  return count < 100;
+}
+
+async function incrementRateLimit(kv: KVNamespace): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  const countKey = `ratelimit:register:${today}`;
+  const count = parseInt(await kv.get(countKey) || '0');
+  await kv.put(countKey, String(count + 1), { expirationTtl: 86400 });
+}
+
+// POST /register - create new API key
+register.post('/', async (c) => {
+  // Check rate limit
+  if (!await checkRateLimit(c.env.CODEMAP_KV)) {
+    return c.json({
+      error: 'Registration limit reached (100/day)',
+      message: 'Try again tomorrow or self-host your own instance',
+      docs: 'https://github.com/your-username/codemap/blob/main/mcp-server/README.md#self-hosting',
+    }, 429);
+  }
+
+  // Generate new API key
+  const apiKey = generateApiKey();
+  const keyHash = await hashApiKey(apiKey);
+
+  // Store hash only (never store plain key)
+  await c.env.CODEMAP_KV.put(`apikey:${keyHash}`, JSON.stringify({
+    created: new Date().toISOString(),
+  }));
+
+  // Increment rate limit counter
+  await incrementRateLimit(c.env.CODEMAP_KV);
+
+  // Return key ONCE - user must save it
+  return c.json({
+    api_key: apiKey,
+    user_id: keyHash.substring(0, 16),
+    message: 'Save this API key! It cannot be recovered.',
+    setup: {
+      upload: `curl -X POST https://codemap-mcp.workers.dev/projects/YOUR_PROJECT/code_map -H "Authorization: Bearer ${apiKey}" -d @CODE_MAP.json`,
+      claude_code: {
+        mcpServers: {
+          codemap: {
+            url: 'https://codemap-mcp.workers.dev/mcp',
+            headers: { Authorization: `Bearer ${apiKey}` },
+          },
+        },
+      },
+    },
+  }, 201);
+});
+
+export default register;
+```
+
+**Files to Create**:
+- `mcp-server/src/auth.ts`
+- `mcp-server/src/routes/register.ts`
+- `mcp-server/src/auth.test.ts`
+
+**Files to Modify**:
+- `mcp-server/src/router.ts` (mount /register route)
+
+**Success Criteria**:
+- [ ] `POST /register` generates new API key and returns it once
+- [ ] API key format: `cm_` + 43 base62 characters
+- [ ] Key hash stored in KV, plain key never stored
+- [ ] Rate limit enforced (100/day, 429 after)
+- [ ] `validateApiKey()` returns true only for registered keys
+- [ ] `getUserIdFromApiKey()` returns consistent 16-char user ID
+- [ ] Response includes ready-to-use Claude Code config
+- [ ] `npm test` passes auth tests
+
+**Completion Notes**:
+- **Implementation**: (describe what was done)
+- **Files Created**:
+  - (filename) - (line count) lines
+- **Files Modified**:
+  - (filename)
+- **Tests**: (X tests, Y% coverage)
+- **Build**: tsc: pass
+- **Branch**: feature/6.3-rest-api-deployment
+- **Notes**: (any additional context)
+
+---
+
+**Subtask 6.3.2: REST API for Project Upload (3-4 hours)**
+
+**Prerequisites**:
+- [x] 6.3.1: Auto-Registration and API Key Management
+
+**Deliverables**:
 - [ ] Create `mcp-server/src/routes/projects.ts` with project routes
 - [ ] Implement `POST /projects/:id/code_map` to upload CODE_MAP.json (user-scoped)
 - [ ] Implement `GET /projects/:id/code_map` to retrieve CODE_MAP.json (user-scoped)
 - [ ] Implement `DELETE /projects/:id` to delete project (user-scoped)
 - [ ] Implement `GET /projects` to list user's projects only
 - [ ] Add request body size limit (5MB max for CODE_MAP.json)
-- [ ] Add API key authentication that derives user ID from key hash
+- [ ] Add auth middleware using `validateApiKey()` from auth.ts
 - [ ] Return proper HTTP status codes (201, 200, 204, 404, 401)
 - [ ] Write test `mcp-server/src/routes/projects.test.ts`
 
@@ -3482,28 +3660,62 @@ export async function getArchitecture(
 - **API key hashing**: Keys are hashed immediately, never stored in plain text
 - **No cross-user access**: Storage methods require user ID, enforced at storage layer
 
-**Skeleton Code** (`mcp-server/src/auth.ts`):
+**Skeleton Code** (`mcp-server/src/routes/projects.ts`):
 ```typescript
-// Derive user ID from API key (one-way hash, no PII)
-export async function getUserIdFromApiKey(apiKey: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(apiKey);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex.substring(0, 16); // 16-char user ID
-}
+import { Hono } from 'hono';
+import { CodeMapStorage } from '../storage';
+import { validateApiKey, getUserIdFromApiKey } from '../auth';
 
-// Validate API key exists and return user ID
-export async function validateApiKey(
-  apiKey: string | undefined,
-  validKeys: Set<string>  // or check against KV
-): Promise<{ valid: boolean; userId?: string }> {
-  if (!apiKey) return { valid: false };
-  if (!validKeys.has(apiKey)) return { valid: false };
-  const userId = await getUserIdFromApiKey(apiKey);
-  return { valid: true, userId };
-}
+const projects = new Hono<{ Bindings: Bindings; Variables: { userId: string } }>();
+
+// Auth middleware - validates API key and extracts user ID
+projects.use('*', async (c, next) => {
+  const apiKey = c.req.header('Authorization')?.replace('Bearer ', '');
+  const { valid, userId } = await validateApiKey(c.env.CODEMAP_KV, apiKey);
+
+  if (!valid || !userId) {
+    return c.json({ error: 'Unauthorized', register: 'POST /register to get an API key' }, 401);
+  }
+
+  c.set('userId', userId);
+  await next();
+});
+
+// Upload CODE_MAP.json (user-scoped)
+projects.post('/:id/code_map', async (c) => {
+  const userId = c.get('userId');
+  const projectId = c.req.param('id');
+  const body = await c.req.json();
+
+  const storage = new CodeMapStorage(c.env.CODEMAP_KV);
+  await storage.saveCodeMap(userId, projectId, body);
+
+  return c.json({ message: 'Uploaded', project_id: projectId }, 201);
+});
+
+// Get CODE_MAP.json (user-scoped)
+projects.get('/:id/code_map', async (c) => {
+  const userId = c.get('userId');
+  const projectId = c.req.param('id');
+  const storage = new CodeMapStorage(c.env.CODEMAP_KV);
+  const codeMap = await storage.getCodeMap(userId, projectId);
+
+  if (!codeMap) {
+    return c.json({ error: 'Project not found' }, 404);
+  }
+
+  return c.json(codeMap);
+});
+
+// List projects (user's projects only)
+projects.get('/', async (c) => {
+  const userId = c.get('userId');
+  const storage = new CodeMapStorage(c.env.CODEMAP_KV);
+  const projectIds = await storage.listProjects(userId);
+  return c.json({ projects: projectIds });
+});
+
+export default projects;
 ```
 
 **Skeleton Code** (`mcp-server/src/routes/projects.ts`):

@@ -33,6 +33,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.104",
+    "uvicorn>=0.24",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
@@ -40,14 +44,15 @@ dev = [
     "mypy>=1.7",
     "pre-commit>=3.0",
     "types-toml>=0.10.8.7",
-    "types-click>=8.1",
+    "types-click>=7.1.8",
+    "httpx>=0.25",
 ]
 
 [project.scripts]
 codemap = "codemap.cli:cli"
 
 [tool.setuptools]
-packages = ["codemap", "codemap.analyzer", "codemap.output", "codemap.hooks"]
+packages = ["codemap", "codemap.analyzer", "codemap.output", "codemap.hooks", "codemap.api"]
 
 [tool.ruff]
 line-length = 100
@@ -70,6 +75,10 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "codemap.api.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
