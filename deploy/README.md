@@ -2,7 +2,30 @@
 
 **Deploy CodeMap as a web-accessible API service on AWS Free Tier**
 
-This guide covers the complete deployment process from EC2 instance launch through CloudFront HTTPS configuration.
+This guide covers the complete deployment process from EC2 instance launch through CloudFront HTTPS configuration, security hardening, monitoring, and operational procedures.
+
+## Quick Links
+
+- **Getting Started**: Follow Step 1-4 below for basic deployment
+- **Security**: Read [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) before going live
+- **Monitoring**: Follow [cloudwatch-alarms.md](./cloudwatch-alarms.md) for CloudWatch setup
+- **Backup**: Use [backup-to-s3.sh](./backup-to-s3.sh) for automated S3 backups
+- **S3 Integration**: See [s3-setup.md](./s3-setup.md) for optional results storage
+- **CloudFront**: See [cloudfront-setup.md](./cloudfront-setup.md) for HTTPS configuration
+- **Issues**: Check PRODUCTION_CHECKLIST.md runbook for common problems
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [AWS Free Tier Limits](#aws-free-tier-limits)
+3. [EC2 Instance Setup](#step-1-launch-ec2-instance)
+4. [Systemd Service Setup](#step-3-configure-systemd-service)
+5. [CloudFront HTTPS](#step-4-configure-cloudfront-https)
+6. [Security Hardening](#step-5-security-hardening-optional-but-recommended)
+7. [S3 Backup](#step-6-s3-backup-optional-for-free-tier-expansion)
+8. [GitHub Actions CI/CD](#step-7-github-actions-continuous-deployment)
+9. [Monitoring](#monitoring-and-maintenance)
+10. [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
 
@@ -771,12 +794,50 @@ sudo chown -R codemap:codemap /opt/codemap/results
 # 3. Confirm termination
 ```
 
-## Next Steps
+## Deployment Checklist
 
-1. **CloudFront Setup** → See [CloudFront Setup](./cloudfront-setup.md)
-2. **GitHub Actions Deployment** → See [Deploy Workflow](./../.github/workflows/deploy.yml)
-3. **Production Checklist** → See [Production Checklist](./PRODUCTION_CHECKLIST.md)
-4. **Monitoring** → See [CloudWatch Alarms](./cloudwatch-alarms.md)
+Complete these steps in order for a production deployment:
+
+1. **Deploy Infrastructure**
+   - [ ] Launch EC2 t2.micro instance (Step 1)
+   - [ ] SSH and run setup script (Step 2)
+   - [ ] Verify systemd service (Step 3)
+   - [ ] Configure CloudFront (Step 4)
+
+2. **Security & Hardening**
+   - [ ] Complete security hardening (Step 5)
+   - [ ] Install fail2ban and enable auto-updates
+   - [ ] Review PRODUCTION_CHECKLIST.md security section
+
+3. **Monitoring & Operations**
+   - [ ] Follow cloudwatch-alarms.md to install agent and create alarms
+   - [ ] Set up SNS notifications for alerts
+   - [ ] Create CloudWatch dashboard
+
+4. **Backup & Disaster Recovery**
+   - [ ] Create S3 bucket (s3-setup.md)
+   - [ ] Install backup-to-s3.sh cron job
+   - [ ] Test backup and restore procedure
+
+5. **Continuous Deployment**
+   - [ ] Configure GitHub Secrets (EC2_HOST, EC2_USER, EC2_SSH_KEY)
+   - [ ] Test GitHub Actions workflow
+   - [ ] Verify health check endpoint
+
+6. **Pre-Launch Verification**
+   - [ ] Walk through PRODUCTION_CHECKLIST.md completely
+   - [ ] Verify all infrastructure items checked
+   - [ ] Verify all security items checked
+   - [ ] Verify all monitoring items configured
+   - [ ] Get team sign-off
+
+## Related Documentation
+
+- **[PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)** - Pre-deployment checklist, runbook for common issues, go-live sign-off
+- **[cloudwatch-alarms.md](./cloudwatch-alarms.md)** - CloudWatch agent setup, alarms configuration, dashboard creation
+- **[backup-to-s3.sh](./backup-to-s3.sh)** - Automated backup script for results directory
+- **[cloudfront-setup.md](./cloudfront-setup.md)** - CloudFront HTTPS configuration walkthrough
+- **[s3-setup.md](./s3-setup.md)** - S3 bucket setup for results storage
 
 ## Environment Variables Reference
 
