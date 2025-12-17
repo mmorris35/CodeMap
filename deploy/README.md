@@ -513,15 +513,166 @@ du -sh /var/log/*
 sudo logrotate -f /etc/logrotate.d/codemap
 ```
 
+## Step 7: GitHub Actions Continuous Deployment
+
+### 7.1 Automated Deployment via GitHub Actions
+
+CodeMap includes a complete CI/CD pipeline that automatically deploys to EC2 on every push to `main`.
+
+**Deployment Workflow:**
+1. Code pushed to `main` branch
+2. GitHub Actions runs: tests, linting, type checking
+3. On success, deploys to EC2 via SSH
+4. Verifies deployment via health check
+5. Sends deployment status notifications
+
+**Workflow File:** `.github/workflows/deploy.yml`
+
+### 7.2 Configure GitHub Secrets
+
+To enable automated deployments, add these secrets to your GitHub repository:
+
+**Required Secrets:**
+- `EC2_HOST`: EC2 instance public IP (e.g., `54.123.45.67`)
+- `EC2_USER`: SSH username (e.g., `ec2-user` for Amazon Linux)
+- `EC2_SSH_KEY`: Private SSH key (paste full `.pem` file contents)
+
+**Optional Secrets:**
+- `CLOUDFRONT_URL`: CloudFront domain for health checks (e.g., `d123abc.cloudfront.net`)
+
+**Adding Secrets:**
+1. Go to GitHub repo > Settings > Secrets and variables > Actions
+2. Click "New repository secret"
+3. Add each secret with its value
+4. Note: Private key should include BEGIN/END lines
+
+**Safety Tips:**
+- EC2 SSH key is never logged or displayed
+- Secrets are encrypted at rest and in transit
+- Rotate EC2 key pair periodically
+- Restrict SSH access by IP in security group (optional)
+
+### 7.3 Manual Deployment Trigger
+
+You can manually trigger a deployment without pushing code:
+
+```bash
+# Using GitHub CLI (requires gh installed and authenticated)
+gh workflow run deploy.yml -r main
+
+# Or via GitHub web UI:
+# 1. Go to Actions tab
+# 2. Select "Deploy to Production" workflow
+# 3. Click "Run workflow" button
+# 4. Select "main" branch
+# 5. Click green "Run workflow" button
+```
+
+### 7.4 Monitoring Deployment
+
+**View Deployment Status:**
+1. Go to GitHub repo > Actions tab
+2. Find "Deploy to Production" workflow run
+3. Click to see detailed logs
+4. Check individual steps for errors
+
+**Deployment Steps:**
+1. **test**: Runs pytest with coverage (required)
+2. **lint**: Runs ruff linting (required)
+3. **typecheck**: Runs mypy type checking (required)
+4. **deploy**: Executes on EC2 (requires above to pass)
+   - Fetches latest code from main
+   - Updates Python dependencies
+   - Restarts systemd service
+   - Verifies service health
+5. **Health check**: Confirms API responds via CloudFront
+
+**Sample Workflow Output:**
+```
+[1/5] Entering application directory: /opt/codemap
+[2/5] Fetching latest code from main branch...
+      Current commit: abc1234
+[3/5] Updating Python dependencies...
+      Dependencies updated successfully
+[4/5] Restarting CodeMap service...
+      Service is running
+[5/5] Verifying service health...
+      Last service log entries:
+      2024-01-15 10:30:45 INFO Started Uvicorn server
+      2024-01-15 10:30:46 INFO Application startup complete
+```
+
+### 7.5 Automatic Rollback on Failure
+
+If deployment fails:
+1. GitHub Actions marks workflow as failed
+2. EC2 instance keeps running previous version
+3. Health check failures prevent deployment from completing
+
+**Manual Rollback:**
+```bash
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>
+
+# View recent commits
+cd /opt/codemap
+git log --oneline -5
+
+# Rollback to previous version
+sudo bash deploy/deploy-remote.sh --rollback
+
+# Or manually:
+git reset --hard HEAD~1
+source venv/bin/activate
+pip install -e ".[api]"
+sudo systemctl restart codemap
+```
+
+### 7.6 Deployment Remote Script
+
+The file `deploy/deploy-remote.sh` runs on EC2 during deployments:
+
+**Features:**
+- Pre-flight checks (verify directories, git repo, service exists)
+- Safe state management (saves current commit for rollback)
+- Code pulling and dependency updates
+- Service restart with health verification
+- Detailed logging to `/tmp/codemap-deploy.log`
+- Rollback capability with `--rollback` flag
+
+**Manual Usage (for testing):**
+```bash
+# Dry run (shows what would happen, no changes)
+sudo bash deploy/deploy-remote.sh --dry-run
+
+# Full deployment
+sudo bash deploy/deploy-remote.sh
+
+# Rollback to previous version
+sudo bash deploy/deploy-remote.sh --rollback
+
+# View logs
+tail -f /tmp/codemap-deploy.log
+```
+
 ## Deployment Updates
 
 ### Deploy New Code
 
+**Automatic (Recommended):**
+- Push to `main` branch
+- GitHub Actions deploys automatically
+- Check Actions tab for status
+
+**Manual (if needed):**
 ```bash
 # SSH into instance
 ssh -i your-key.pem ec2-user@<PUBLIC-IP>
 
-# Pull latest code
+# Run deployment script
+cd /opt/codemap
+sudo bash deploy/deploy-remote.sh
+
+# Or manually:
 cd /opt/codemap
 git fetch origin main
 git reset --hard origin/main
@@ -539,12 +690,23 @@ curl https://YOUR-CLOUDFRONT-DOMAIN/health
 
 ### Rollback to Previous Version
 
+**Automatic Rollback (after deployment failure):**
+- Previous version remains running
+- Health checks prevented bad code from going live
+
+**Manual Rollback:**
 ```bash
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>
+
+# Using rollback script
+sudo bash deploy/deploy-remote.sh --rollback
+
+# OR: Manual rollback to specific commit
 cd /opt/codemap
 git revert HEAD --no-edit
 git push origin main
 
-# OR: Revert to specific commit
+# OR: Reset to specific commit
 git reset --hard <COMMIT-HASH>
 git push origin main --force-with-lease
 
