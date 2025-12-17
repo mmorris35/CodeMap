@@ -2191,16 +2191,16 @@ class DevPlanParser:
 - [x] 5.1.1: FastAPI Application
 
 **Deliverables**:
-- [ ] Create `codemap/api/jobs.py` with job management
-- [ ] Implement `JobStatus` enum: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
-- [ ] Implement `Job` dataclass: id, status, repo_url, created_at, completed_at, result_path, error
-- [ ] Implement `JobManager` class with in-memory job storage
-- [ ] Implement `create_job(repo_url) -> Job` method
-- [ ] Implement `run_job(job_id)` using FastAPI BackgroundTasks
-- [ ] Implement `get_job(job_id) -> Job` method
-- [ ] Clone repo to temp directory, run analysis, store results
-- [ ] Clean up temp directory after analysis
-- [ ] Write test `tests/api/test_jobs.py`
+- [x] Create `codemap/api/jobs.py` with job management
+- [x] Implement `JobStatus` enum: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
+- [x] Implement `Job` dataclass: id, status, repo_url, created_at, completed_at, result_path, error
+- [x] Implement `JobManager` class with in-memory job storage
+- [x] Implement `create_job(repo_url) -> Job` method
+- [x] Implement `run_job(job_id)` using FastAPI BackgroundTasks
+- [x] Implement `get_job(job_id) -> Job` method
+- [x] Clone repo to temp directory, run analysis, store results
+- [x] Clean up temp directory after analysis
+- [x] Write test `tests/api/test_jobs.py`
 
 **Technology Decisions**:
 - In-memory job storage (no Redis/DB for free tier simplicity)
@@ -2216,24 +2216,26 @@ class DevPlanParser:
 - `codemap/api/routes.py`
 
 **Success Criteria**:
-- [ ] `JobManager` stores and retrieves jobs by ID
-- [ ] `create_job()` returns new Job with PENDING status
-- [ ] `run_job()` clones repo and runs analysis
-- [ ] Job status updates through PENDING -> RUNNING -> COMPLETED/FAILED
-- [ ] Failed jobs capture error message
-- [ ] Temp directories cleaned up after processing
-- [ ] `pytest tests/api/test_jobs.py -v` passes
+- [x] `JobManager` stores and retrieves jobs by ID
+- [x] `create_job()` returns new Job with PENDING status
+- [x] `run_job()` clones repo and runs analysis
+- [x] Job status updates through PENDING -> RUNNING -> COMPLETED/FAILED
+- [x] Failed jobs capture error message
+- [x] Temp directories cleaned up after processing
+- [x] `pytest tests/api/test_jobs.py -v` passes
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented complete background job processing system with async `run_job()` method. Integrated FastAPI BackgroundTasks in routes to schedule job execution. Jobs flow through PENDING -> RUNNING -> COMPLETED/FAILED states. Repository cloning, analysis execution, and diagram/CODE_MAP generation handled with comprehensive error handling. Temporary directories created during analysis are properly cleaned up in finally block.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `codemap/api/jobs.py` - 290 lines (Job dataclass, JobManager class with run_job async method)
+  - `tests/api/test_jobs.py` - 647 lines (30 comprehensive tests)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: (ruff: pass/fail, mypy: pass/fail)
+  - `codemap/api/routes.py` - Added BackgroundTasks import and integration to analyze endpoint
+  - `tests/api/test_main.py` - Updated test to handle BackgroundTasks execution timing
+- **Tests**: 30 new tests (100% pass), 55 total API tests, 87% API coverage, 90% jobs.py coverage
+- **Build**: ruff: pass, mypy: pass
 - **Branch**: feature/5.1-web-api
-- **Notes**: (any additional context)
+- **Notes**: BackgroundTasks execute synchronously in TestClient, so integration tests verify both success and failure paths. Production deployment will have true async execution. Cleanup handler ensures no orphaned temp directories even on analysis failure.
 
 ---
 

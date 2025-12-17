@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
 from codemap.api.models import (
     AnalyzeRequest,
@@ -58,7 +58,10 @@ def get_job_manager() -> JobManager:
     summary="Start code analysis",
     description="Create a new analysis job for the specified repository.",
 )
-async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+async def analyze(
+    request: AnalyzeRequest,
+    background_tasks: BackgroundTasks,
+) -> AnalyzeResponse:
     """Start a new code analysis job.
 
     Accepts a Git repository URL and starts background analysis. Returns
@@ -66,6 +69,7 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
 
     Args:
         request: AnalyzeRequest containing repo_url and optional branch.
+        background_tasks: FastAPI BackgroundTasks to schedule job execution.
 
     Returns:
         AnalyzeResponse with job_id, status, and creation timestamp.
@@ -82,6 +86,10 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
             request.repo_url,
             request.branch,
         )
+
+        # Schedule job execution in background
+        background_tasks.add_task(job_manager.run_job, job.id)
+        logger.debug("Scheduled background job execution for job %s", job.id)
 
         return AnalyzeResponse(
             job_id=job.id,
