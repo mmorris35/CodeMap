@@ -1,0 +1,596 @@
+# CodeMap AWS Deployment Guide
+
+**Deploy CodeMap as a web-accessible API service on AWS Free Tier**
+
+This guide covers the complete deployment process from EC2 instance launch through CloudFront HTTPS configuration.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    Internet (HTTPS)                 │
+└────────────────────┬────────────────────────────────┘
+                     │
+         ┌───────────▼────────────┐
+         │  CloudFront (HTTPS)    │
+         │  *.cloudfront.net      │
+         │  ACM Certificate       │
+         └───────────┬────────────┘
+                     │ HTTP (port 80)
+         ┌───────────▼────────────────────┐
+         │  EC2 t2.micro (Amazon Linux)   │
+         │  ┌──────────────────────────┐  │
+         │  │  Systemd Service         │  │
+         │  │  ┌────────────────────┐  │  │
+         │  │  │ Uvicorn (port 8000)│  │  │
+         │  │  │ ┌────────────────┐ │  │  │
+         │  │  │ │ FastAPI App    │ │  │  │
+         │  │  │ │ /health /docs  │ │  │  │
+         │  │  │ │ /analyze       │ │  │  │
+         │  │  │ └────────────────┘ │  │  │
+         │  │  └────────────────────┘  │  │
+         │  └──────────────────────────┘  │
+         │  /opt/codemap/ (application)   │
+         │  /opt/codemap/results/ (data)  │
+         │  /etc/codemap/env (config)     │
+         └────────────────┬───────────────┘
+                          │
+         ┌────────────────▼─────────────┐
+         │  S3 (optional, future)       │
+         │  Results backup & archival   │
+         └──────────────────────────────┘
+```
+
+## Prerequisites
+
+- AWS Account with Free Tier eligibility
+- EC2 key pair created in AWS Console
+- Recommended: Basic AWS/Linux knowledge
+
+## AWS Free Tier Limits
+
+Be aware of these limits to avoid unexpected charges:
+
+| Service | Free Tier | Our Usage | Status |
+|---------|-----------|-----------|--------|
+| EC2 t2.micro | 750 hrs/mo | 744 hrs (24/7) | ✓ OK |
+| EBS | 30 GB SSD | ~10 GB | ✓ OK |
+| CloudFront | 1 TB out + 10M req/mo | Variable | ⚠️ Monitor |
+| Data Transfer | 100 GB out/mo | Variable | ⚠️ Monitor |
+| CloudWatch | 10 metrics, 10 alarms | Basic only | ✓ OK |
+
+**Important: Never use NAT Gateway or ALB/ELB - NOT FREE (~$30+/mo)**
+
+## Step 1: Launch EC2 Instance
+
+### 1.1 Log into AWS Console
+
+1. Navigate to [AWS Console](https://console.aws.amazon.com)
+2. Go to **EC2 Dashboard**
+3. Click **Launch Instance**
+
+### 1.2 Instance Configuration
+
+**Name and Tags**
+- Instance name: `codemap-api`
+- Add tag: `Environment: production`
+- Add tag: `Application: codemap`
+
+**AMI Selection**
+- Search for "Amazon Linux 2023"
+- Select **Amazon Linux 2023 AMI** (free tier eligible)
+- Architecture: **64-bit (x86)**
+
+**Instance Type**
+- Type: **t2.micro** (Free Tier eligible)
+- ✓ Only t2.micro qualifies for free tier
+
+**Key Pair**
+- Select or create SSH key pair
+- Download and save the `.pem` file locally
+- Set permissions: `chmod 600 your-key.pem`
+
+**Network Settings**
+- Create or select VPC (default is fine)
+- Auto-assign public IP: **Enable**
+- Create or select Security Group
+  - Inbound Rules:
+    - Type: SSH, Source: Your IP (or 0.0.0.0/0 for testing)
+    - Type: HTTP, Source: 0.0.0.0/0
+    - Type: HTTPS, Source: 0.0.0.0/0
+
+**Storage**
+- Size: **30 GB** (maximum free tier)
+- Type: **gp3** (default, performance)
+- Delete on termination: ✓ Checked
+
+**Review and Launch**
+- Review all settings
+- Click **Launch Instance**
+- Wait 1-2 minutes for instance to start
+
+### 1.3 Get Instance Details
+
+1. Go to EC2 Dashboard > Instances
+2. Select your instance
+3. Note the following:
+   - **Public IPv4 address**: Used for SSH and CloudFront origin
+   - **Private IPv4 address**: Internal only
+   - **Instance ID**: For reference
+
+## Step 2: SSH into EC2 Instance
+
+### 2.1 Connect via SSH
+
+```bash
+# SSH into instance
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>
+
+# Replace <PUBLIC-IP> with the actual public IP from AWS Console
+# Example: ssh -i my-key.pem ec2-user@54.123.45.67
+```
+
+### 2.2 Run EC2 Setup Script
+
+Once connected, run the automated setup:
+
+```bash
+# Download and run setup script
+curl -fsSL https://raw.githubusercontent.com/YOUR-USERNAME/codemap/main/deploy/ec2-setup.sh | bash
+# OR
+cd ~
+git clone https://github.com/YOUR-USERNAME/codemap.git
+cd codemap
+bash deploy/ec2-setup.sh
+```
+
+**What the script does:**
+- Updates system packages
+- Installs Python 3.11, git, pip
+- Creates `codemap` system user
+- Clones repository to `/opt/codemap`
+- Creates Python virtualenv
+- Installs CodeMap with API dependencies
+- Configures firewall (UFW) to allow ports 22, 80, 443
+- Sets up log rotation
+
+**Troubleshooting:**
+- If script fails, review `/var/log/messages` for details
+- Ensure you have internet connectivity
+- Check disk space: `df -h` (should have >5 GB free)
+
+## Step 3: Configure Systemd Service
+
+### 3.1 Review Environment File
+
+The setup script creates `/etc/codemap/env` with default settings. Review and edit if needed:
+
+```bash
+sudo nano /etc/codemap/env
+```
+
+Available options:
+```bash
+# Deployment environment
+CODEMAP_ENV=production
+
+# Logging level: DEBUG, INFO, WARNING, ERROR
+CODEMAP_LOG_LEVEL=INFO
+
+# Results storage directory (automatically created by setup)
+CODEMAP_RESULTS_DIR=/opt/codemap/results
+
+# AWS settings (optional, for future S3 integration)
+AWS_DEFAULT_REGION=us-west-2
+
+# Storage backend: local (default) or s3
+CODEMAP_STORAGE=local
+```
+
+### 3.2 Install and Enable Service
+
+```bash
+# Install systemd service
+cd /opt/codemap
+sudo bash deploy/install-service.sh
+
+# This creates:
+# - /etc/systemd/system/codemap.service
+# - Enables and starts the service
+```
+
+### 3.3 Manage the Service
+
+```bash
+# Check service status
+sudo systemctl status codemap
+
+# View logs (follow in real-time)
+sudo journalctl -u codemap -f
+
+# Restart service (after code updates)
+sudo systemctl restart codemap
+
+# Stop service
+sudo systemctl stop codemap
+
+# View logs from last 50 lines
+sudo journalctl -u codemap -n 50
+
+# View logs since last 1 hour
+sudo journalctl -u codemap --since "1 hour ago"
+```
+
+### 3.4 Test the API
+
+```bash
+# Test health endpoint
+curl http://localhost:8000/health
+
+# Should return:
+# {"status":"healthy"}
+
+# View API documentation
+# (Only works via CloudFront after HTTPS is set up)
+curl http://localhost:8000/docs
+```
+
+## Step 4: Configure CloudFront HTTPS
+
+See [CloudFront Setup Instructions](./cloudfront-setup.md) for detailed steps.
+
+**Summary:**
+1. Request free SSL certificate via ACM
+2. Create CloudFront distribution
+3. Point origin to EC2 Elastic IP
+4. Configure cache behaviors
+5. Test via CloudFront domain
+
+## Step 5: Security Hardening (Optional but Recommended)
+
+### 5.1 SSH Hardening
+
+```bash
+# Disable password authentication (key-only)
+sudo nano /etc/ssh/sshd_config
+
+# Set these lines:
+PasswordAuthentication no
+PubkeyAuthentication yes
+
+# Reload SSH
+sudo systemctl reload sshd
+```
+
+### 5.2 Firewall Configuration
+
+The setup script configures UFW. Verify:
+
+```bash
+# Check firewall status
+sudo ufw status
+
+# Should show:
+# Status: active
+# To                         Action      From
+# --                         ------      ----
+# 22/tcp                     ALLOW       Anywhere
+# 80/tcp                     ALLOW       Anywhere
+# 443/tcp                    ALLOW       Anywhere
+```
+
+### 5.3 Install Fail2Ban (SSH Brute-Force Protection)
+
+```bash
+sudo dnf install -y fail2ban
+
+# Enable and start
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+```
+
+### 5.4 Enable Automatic Security Updates
+
+```bash
+# Install unattended-upgrades
+sudo dnf install -y dnf-automatic
+
+# Enable automatic updates
+sudo systemctl enable dnf-automatic.timer
+sudo systemctl start dnf-automatic.timer
+```
+
+## Step 6: S3 Backup (Optional, for Free Tier Expansion)
+
+For automatic results backup to S3:
+
+1. Create S3 bucket: `codemap-results-YOUR-ACCOUNT-ID`
+2. Set up IAM role on EC2 instance
+3. Enable S3 storage in `/etc/codemap/env`:
+   ```bash
+   CODEMAP_STORAGE=s3
+   CODEMAP_S3_BUCKET=codemap-results-YOUR-ACCOUNT-ID
+   ```
+4. See [S3 Setup Instructions](./s3-setup.md)
+
+## Monitoring and Maintenance
+
+### Health Checks
+
+```bash
+# Test API endpoint
+curl -f https://YOUR-CLOUDFRONT-DOMAIN/health || echo "API DOWN"
+
+# Via CloudFront (once configured)
+curl https://d123abc.cloudfront.net/health
+
+# Check system resources
+free -h          # Memory usage
+df -h             # Disk usage
+top -b -n 1       # Top processes
+```
+
+### Log Review
+
+```bash
+# Follow application logs
+sudo journalctl -u codemap -f
+
+# Filter by log level
+sudo journalctl -u codemap -p warn
+
+# Export logs to file
+sudo journalctl -u codemap > codemap-logs.txt
+```
+
+### Common Issues
+
+**Service won't start**
+```bash
+# Check service status for error messages
+sudo systemctl status codemap -l --full
+
+# Review logs for specific errors
+sudo journalctl -u codemap -n 100
+```
+
+**API returns 502 Bad Gateway**
+```bash
+# Check if service is running
+sudo systemctl is-active codemap
+
+# Check if port 8000 is listening
+sudo netstat -tlnp | grep 8000
+
+# Restart service
+sudo systemctl restart codemap
+```
+
+**High memory usage**
+```bash
+# Check memory usage
+free -h
+
+# Restart service to clear memory
+sudo systemctl restart codemap
+```
+
+**Disk space full**
+```bash
+# Check disk usage
+df -h
+
+# Clean up old results
+sudo rm -rf /opt/codemap/results/*
+
+# Check log size
+du -sh /var/log/*
+
+# Rotate logs if needed
+sudo logrotate -f /etc/logrotate.d/codemap
+```
+
+## Deployment Updates
+
+### Deploy New Code
+
+```bash
+# SSH into instance
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>
+
+# Pull latest code
+cd /opt/codemap
+git fetch origin main
+git reset --hard origin/main
+
+# Reinstall dependencies (if changed)
+source venv/bin/activate
+pip install -e ".[api]"
+
+# Restart service
+sudo systemctl restart codemap
+
+# Verify
+curl https://YOUR-CLOUDFRONT-DOMAIN/health
+```
+
+### Rollback to Previous Version
+
+```bash
+cd /opt/codemap
+git revert HEAD --no-edit
+git push origin main
+
+# OR: Revert to specific commit
+git reset --hard <COMMIT-HASH>
+git push origin main --force-with-lease
+
+# Restart service
+sudo systemctl restart codemap
+```
+
+## Cost Monitoring
+
+### Set Up Billing Alerts
+
+1. Go to [AWS Billing Console](https://console.aws.amazon.com/billing)
+2. Click **Billing Preferences**
+3. Enable **Alert Type: Free Tier Usage Alerts**
+4. Set threshold: $5.00
+5. Add email address for notifications
+
+### Monitor Usage
+
+```bash
+# Check EC2 costs (in AWS Console):
+# - EC2 Dashboard > Instances > Right-click instance > Cost allocation tags
+
+# Important metrics:
+# - EC2 running hours (should be ~744/month for t2.micro)
+# - Data transfer out (CloudFront counts here)
+# - CloudFront requests (monitor for unexpected usage)
+```
+
+## Disaster Recovery
+
+### Backup Results
+
+```bash
+# Manual backup to local machine
+scp -i your-key.pem -r ec2-user@<PUBLIC-IP>:/opt/codemap/results ./codemap-backup
+
+# Automated backup to S3 (if configured)
+# See s3-setup.md for backup script
+```
+
+### Restore from Backup
+
+```bash
+# SCP backup back to instance
+scp -i your-key.pem -r ./codemap-backup ec2-user@<PUBLIC-IP>:/opt/codemap/results
+
+# Fix permissions
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>
+sudo chown -R codemap:codemap /opt/codemap/results
+```
+
+### Terminate Instance (if needed)
+
+```bash
+# WARNING: This deletes everything on the instance!
+# Make sure you have backups.
+
+# In AWS Console:
+# 1. EC2 Dashboard > Instances
+# 2. Right-click instance > Instance State > Terminate
+# 3. Confirm termination
+```
+
+## Next Steps
+
+1. **CloudFront Setup** → See [CloudFront Setup](./cloudfront-setup.md)
+2. **GitHub Actions Deployment** → See [Deploy Workflow](./../.github/workflows/deploy.yml)
+3. **Production Checklist** → See [Production Checklist](./PRODUCTION_CHECKLIST.md)
+4. **Monitoring** → See [CloudWatch Alarms](./cloudwatch-alarms.md)
+
+## Environment Variables Reference
+
+Create `/etc/codemap/env` with the following variables:
+
+```bash
+# Required
+CODEMAP_ENV=production
+CODEMAP_RESULTS_DIR=/opt/codemap/results
+
+# Optional
+CODEMAP_LOG_LEVEL=INFO
+CODEMAP_STORAGE=local
+AWS_DEFAULT_REGION=us-west-2
+
+# For S3 Storage
+CODEMAP_S3_BUCKET=codemap-results-ACCOUNT-ID
+AWS_ACCESS_KEY_ID=xxx (if not using IAM role)
+AWS_SECRET_ACCESS_KEY=xxx (if not using IAM role)
+```
+
+## Troubleshooting
+
+### Instance won't connect via SSH
+
+```bash
+# 1. Check instance status in AWS Console
+#    Should be "running" and status checks "2/2 passed"
+
+# 2. Verify security group allows SSH from your IP
+#    EC2 > Security Groups > Select group > Inbound Rules
+#    Should have SSH (port 22) rule
+
+# 3. Check SSH key permissions
+chmod 600 your-key.pem
+
+# 4. Verify correct IP and username
+ssh -i your-key.pem ec2-user@<PUBLIC-IP>  # NOT ubuntu, NOT root
+```
+
+### Setup script fails
+
+```bash
+# Check if running as root
+whoami  # Should be "root"
+
+# Run with sudo if not
+sudo bash deploy/ec2-setup.sh
+
+# Check for disk space
+df -h  # Need >5 GB free
+
+# Check for internet connectivity
+ping 8.8.8.8
+
+# View system logs
+tail -50 /var/log/messages
+```
+
+### Service won't start
+
+```bash
+# Check for syntax errors
+systemd-analyze verify /etc/systemd/system/codemap.service
+
+# Check permissions on directories
+ls -la /opt/codemap
+ls -la /opt/codemap/results
+
+# Ensure codemap user can write to results
+sudo chown -R codemap:codemap /opt/codemap/results
+```
+
+### API returns 502 Bad Gateway via CloudFront
+
+```bash
+# 1. Check if service is running
+sudo systemctl status codemap
+
+# 2. Check if port 8000 is listening
+sudo netstat -tlnp | grep 8000
+
+# 3. Check logs
+sudo journalctl -u codemap -n 50
+
+# 4. Verify CloudFront origin is correct
+#    CloudFront > Distributions > Select distribution > Origins
+#    Origin domain should be EC2 public IP
+```
+
+## Getting Help
+
+- **AWS Documentation**: https://docs.aws.amazon.com/
+- **CodeMap GitHub**: https://github.com/your-username/codemap
+- **Issues**: https://github.com/your-username/codemap/issues
+- **FastAPI Docs**: https://fastapi.tiangolo.com/
+
+---
+
+**Last Updated**: 2024-12-17
+**Version**: 1.0.0
+**Maintained by**: CodeMap Team
