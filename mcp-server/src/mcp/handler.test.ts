@@ -413,7 +413,10 @@ describe("MCP Handler", () => {
       )) as any;
       const resourceUris = response.result.resources.map((r: any) => r.uri);
 
-      expect(resourceUris).toContain("codemap://project");
+      // Check that we have URIs containing codemap://project
+      expect(
+        resourceUris.some((uri: string) => uri.includes("codemap://project")),
+      ).toBe(true);
     });
 
     it("should include resource descriptions", async () => {
@@ -831,6 +834,246 @@ describe("MCP Handler", () => {
       const response = await handleMcpRequest(request, storage, userId);
 
       expect(response.id).toBe("uuid-1234-5678");
+    });
+  });
+
+  describe("resources/list", () => {
+    it("should return available resource templates", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/list",
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("result" in response).toBe(true);
+      expect(response.result.resources).toBeDefined();
+      expect(response.result.resources.length).toBeGreaterThan(0);
+
+      // Check for both resource types
+      const uris = response.result.resources.map(
+        (r: any) => r.uri,
+      );
+      expect(
+        uris.some((uri: string) => uri.includes("code_map.json")),
+      ).toBe(true);
+      expect(
+        uris.some((uri: string) => uri.includes("summary")),
+      ).toBe(true);
+    });
+
+    it("should include resource descriptions", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/list",
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      const resources = response.result.resources;
+      for (const resource of resources) {
+        expect(resource.name).toBeDefined();
+        expect(resource.description).toBeDefined();
+        expect(resource.mimeType).toBeDefined();
+      }
+    });
+  });
+
+  describe("resources/read", () => {
+    const sampleCodeMap = {
+      version: "1.0",
+      generated_at: "2024-01-01T00:00:00Z",
+      source_root: "/app",
+      symbols: [
+        {
+          qualified_name: "auth.validate",
+          kind: "function",
+          file: "auth.ts",
+          line: 10,
+          docstring: "Validates tokens",
+        },
+      ],
+      dependencies: [],
+    };
+
+    it("should read code_map.json resource", async () => {
+      const getCodeMapMock = vi.fn().mockResolvedValue(sampleCodeMap);
+      (storage as any).getCodeMap = getCodeMapMock;
+
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {
+          uri: "codemap://project/test-app/code_map.json",
+        },
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("result" in response).toBe(true);
+      expect(response.result.uri).toBe(
+        "codemap://project/test-app/code_map.json",
+      );
+      expect(response.result.mimeType).toBe("application/json");
+
+      const parsed = JSON.parse(response.result.text);
+      expect(parsed.version).toBe("1.0");
+      expect(parsed.symbols.length).toBe(1);
+
+      expect(getCodeMapMock).toHaveBeenCalledWith(userId, "test-app");
+    });
+
+    it("should read summary resource", async () => {
+      const getCodeMapMock = vi.fn().mockResolvedValue(sampleCodeMap);
+      (storage as any).getCodeMap = getCodeMapMock;
+
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {
+          uri: "codemap://project/test-app/summary",
+        },
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("result" in response).toBe(true);
+      expect(response.result.uri).toBe(
+        "codemap://project/test-app/summary",
+      );
+      expect(response.result.mimeType).toBe("text/plain");
+      expect(response.result.text).toContain("# Architecture Summary");
+
+      expect(getCodeMapMock).toHaveBeenCalledWith(userId, "test-app");
+    });
+
+    it("should return error for invalid URI", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {
+          uri: "invalid://uri",
+        },
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("error" in response).toBe(true);
+      expect(response.error.code).toBe(-32602);
+      expect(response.error.message).toContain("Invalid resource URI");
+    });
+
+    it("should return error for non-existent project", async () => {
+      const getCodeMapMock = vi.fn().mockResolvedValue(null);
+      (storage as any).getCodeMap = getCodeMapMock;
+
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {
+          uri: "codemap://project/non-existent/code_map.json",
+        },
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("error" in response).toBe(true);
+      expect(response.error.code).toBe(-32602);
+      expect(response.error.message).toContain("Project not found");
+    });
+
+    it("should return error for missing uri parameter", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {},
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("error" in response).toBe(true);
+      expect(response.error.code).toBe(-32602);
+      expect(response.error.message).toContain("uri");
+    });
+
+    it("should return error for invalid params type", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: "not an object",
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("error" in response).toBe(true);
+      // Invalid params type (not an object) is -32600 (Invalid Request)
+      expect(response.error.code).toBe(-32600);
+    });
+
+    it("should handle storage errors gracefully", async () => {
+      const getCodeMapMock = vi
+        .fn()
+        .mockRejectedValue(new Error("Storage error"));
+      (storage as any).getCodeMap = getCodeMapMock;
+
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "resources/read",
+        params: {
+          uri: "codemap://project/test-app/code_map.json",
+        },
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+
+      expect("error" in response).toBe(true);
+      expect(response.error.code).toBe(-32603);
+      expect(response.error.message).toContain("Failed to read project");
     });
   });
 });

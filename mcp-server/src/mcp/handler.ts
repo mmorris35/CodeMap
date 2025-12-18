@@ -9,6 +9,7 @@ import type {
   InitializeResponse,
   ToolsListResponse,
   ResourcesListResponse,
+  ResourceReadResponse,
   Tool,
   Resource,
 } from "./types";
@@ -22,6 +23,7 @@ import { handleGetDependents } from "./tools/get-dependents";
 import { handleGetImpactReport } from "./tools/get-impact-report";
 import { handleCheckBreakingChange } from "./tools/check-breaking-change";
 import { handleGetArchitecture } from "./tools/get-architecture";
+import { readResource } from "./resources";
 
 /**
  * Server information
@@ -133,16 +135,29 @@ const TOOLS: Tool[] = [
 ];
 
 /**
- * Available resources in the MCP server
+ * Get available resources for a user's projects
+ *
+ * Returns resource templates that indicate what resources are available.
+ * Actual resources are read via resources/read with specific project IDs.
  */
-const RESOURCES: Resource[] = [
-  {
-    uri: "codemap://project",
-    name: "Project CodeMap",
-    description: "The CODE_MAP.json for the currently analyzed project",
-    mimeType: "application/json",
-  },
-];
+function getAvailableResources(): Resource[] {
+  return [
+    {
+      uri: "codemap://project/{projectId}/code_map.json",
+      name: "Full CodeMap JSON",
+      description:
+        "Complete CODE_MAP.json for a project, including all symbols and dependencies",
+      mimeType: "application/json",
+    },
+    {
+      uri: "codemap://project/{projectId}/summary",
+      name: "Architecture Summary",
+      description:
+        "Human-readable text summary of the project architecture and statistics",
+      mimeType: "text/plain",
+    },
+  ];
+}
 
 /**
  * Handler function for MCP requests
@@ -197,6 +212,9 @@ export async function handleMcpRequest(
 
       case "resources/list":
         return handleResourcesList(id);
+
+      case "resources/read":
+        return await handleResourcesRead(id, params, storage, userId);
 
       default:
         return {
@@ -292,7 +310,7 @@ function handleToolsList(id: string | number | null): JSONRPCResponseType {
  */
 function handleResourcesList(id: string | number | null): JSONRPCResponseType {
   const response: ResourcesListResponse = {
-    resources: RESOURCES,
+    resources: getAvailableResources(),
   };
 
   return {
@@ -401,5 +419,69 @@ async function handleToolCall(
     jsonrpc: "2.0",
     id,
     result,
+  };
+}
+
+/**
+ * Handle resources/read request
+ * Reads resource content and returns it to the client
+ */
+async function handleResourcesRead(
+  id: string | number | null,
+  params: unknown,
+  storage: CodeMapStorage,
+  userId: string,
+): Promise<JSONRPCResponseType> {
+  if (typeof params !== "object" || params === null) {
+    return {
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code: -32602,
+        message: "Invalid params: expected object",
+      },
+    };
+  }
+
+  const readParams = params as Record<string, unknown>;
+  const uri = readParams.uri;
+
+  if (typeof uri !== "string") {
+    return {
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code: -32602,
+        message: 'Invalid params: missing or invalid "uri" field',
+      },
+    };
+  }
+
+  // Read the resource
+  const result = await readResource(uri, storage, userId);
+
+  // Check if result is an error
+  if ("error" in result) {
+    return {
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code: result.code,
+        message: result.error,
+      },
+    };
+  }
+
+  // Return the resource content
+  const response: ResourceReadResponse = {
+    uri: result.uri,
+    mimeType: result.mimeType,
+    text: result.text,
+  };
+
+  return {
+    jsonrpc: "2.0",
+    id,
+    result: response,
   };
 }

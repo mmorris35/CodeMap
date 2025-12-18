@@ -113,6 +113,15 @@ export interface ResourcesListResponse {
 }
 
 /**
+ * MCP resource read response
+ */
+export interface ResourceReadResponse {
+  uri: string;
+  mimeType: string;
+  text: string;
+}
+
+/**
  * Tool call result
  */
 export interface ToolContent {

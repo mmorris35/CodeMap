@@ -111,12 +111,12 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 - [x] 6.2.3: MCP Tool - get_impact_report
 - [x] 6.2.4: MCP Tool - check_breaking_change
 - [x] 6.2.5: MCP Tool - get_architecture
-- [ ] 6.3.1: REST API for Project Upload
-- [ ] 6.3.2: MCP Resource Endpoint
+- [x] 6.3.1: REST API for Project Upload
+- [x] 6.3.2: MCP Resource Endpoint
 - [ ] 6.3.3: Cloudflare Deployment and Testing
 
-**Current**: Phase 6.2.5
-**Next**: 6.3.1
+**Current**: Phase 6.3.2
+**Next**: 6.3.3
 
 ---
 
@@ -3861,13 +3861,13 @@ export default projects;
 - [x] 6.3.1: REST API for Project Upload
 
 **Deliverables**:
-- [ ] Implement `resources/read` MCP method in handler
-- [ ] Support URI format: `codemap://project/{id}/code_map.json`
-- [ ] Return CODE_MAP.json as text resource with MIME type `application/json`
-- [ ] Support URI: `codemap://project/{id}/summary` for text summary
-- [ ] Add resources to `resources/list` response
-- [ ] Handle invalid URIs with clear error
-- [ ] Write test `mcp-server/src/mcp/resources.test.ts`
+- [x] Implement `resources/read` MCP method in handler
+- [x] Support URI format: `codemap://project/{id}/code_map.json`
+- [x] Return CODE_MAP.json as text resource with MIME type `application/json`
+- [x] Support URI: `codemap://project/{id}/summary` for text summary
+- [x] Add resources to `resources/list` response
+- [x] Handle invalid URIs with clear error
+- [x] Write test `mcp-server/src/mcp/resources.test.ts`
 
 **Technology Decisions**:
 - MCP resources for read-only data access
@@ -3888,23 +3888,30 @@ codemap://project/{id}/summary        → Text summary of architecture
 - `mcp-server/src/mcp/handler.ts` (add resources/read)
 
 **Success Criteria**:
-- [ ] `resources/list` returns available resources
-- [ ] `resources/read` with code_map.json URI returns full JSON
-- [ ] `resources/read` with summary URI returns text summary
-- [ ] Invalid URI returns proper MCP error
-- [ ] Non-existent project returns proper MCP error
-- [ ] `npm test` passes resource tests
+- [x] `resources/list` returns available resources
+- [x] `resources/read` with code_map.json URI returns full JSON
+- [x] `resources/read` with summary URI returns text summary
+- [x] Invalid URI returns proper MCP error
+- [x] Non-existent project returns proper MCP error
+- [x] `npm test` passes resource tests
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
+- **Implementation**: Implemented MCP resource endpoint with support for reading CODE_MAP.json and architecture summaries. Created resource handler to parse URIs, validate project access, and generate human-readable summaries on-demand from CODE_MAP data.
 - **Files Created**:
-  - (filename) - (line count) lines
+  - `mcp-server/src/mcp/resources.ts` - 209 lines (resource parsing, summary generation, content reading)
+  - `mcp-server/src/mcp/resources.test.ts` - 384 lines (comprehensive URI parsing, summary generation, and resource reading tests)
 - **Files Modified**:
-  - (filename)
-- **Tests**: (X tests, Y% coverage)
-- **Build**: tsc: pass
+  - `mcp-server/src/mcp/handler.ts` - Added resources/read handler, updated types import, and modified resources/list to use template URIs
+  - `mcp-server/src/mcp/types.ts` - Added ResourceReadResponse interface
+  - `mcp-server/src/mcp/handler.test.ts` - Added 10 comprehensive tests for resources/list and resources/read methods
+- **Tests**: 331 tests total, all passing (10 new resource-related tests in handler, 26 new tests in resources module)
+- **Build**: tsc: pass, npm test: pass
 - **Branch**: feature/6.3-rest-api-deployment
-- **Notes**: (any additional context)
+- **Notes**:
+  - Resource URIs use template format `codemap://project/{projectId}/...` for listing, actual URIs include project ID
+  - Summary generation extracts module structure, counts symbol kinds, and identifies dependency hotspots
+  - All operations are user-scoped for security (inherited from storage layer)
+  - Error handling follows JSON-RPC 2.0 spec (-32602 for invalid params, -32603 for internal errors)
 
 ---
 
