@@ -10,6 +10,7 @@ import { logger } from "hono/logger";
 import type { Bindings, HealthResponse, APIInfoResponse } from "./types";
 import { handleMcpRequest } from "./mcp/handler";
 import { CodeMapStorage } from "./storage";
+import projectsRouter from "./routes/projects";
 
 /**
  * Create and configure the Hono application
@@ -108,6 +109,12 @@ app.get("/health/ready", async (c) => {
     return c.json(response, 503);
   }
 });
+
+/**
+ * Mount projects router at /projects
+ * Handles project management with API key authentication
+ */
+app.route("/projects", projectsRouter);
 
 /**
  * POST /mcp - MCP Protocol endpoint
