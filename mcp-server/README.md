@@ -1,5 +1,9 @@
 # CodeMap MCP Server
 
+[![Deployed on Cloudflare Workers](https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-f38020?logo=cloudflare)](https://workers.cloudflare.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178c6?logo=typescript)](https://www.typescriptlang.org/)
+[![MCP Protocol](https://img.shields.io/badge/MCP%20Protocol-1.0-4a7c59)](https://modelcontextprotocol.io/)
+
 An MCP (Model Context Protocol) server deployed on Cloudflare Workers that provides dependency analysis and impact assessment tools for Claude Code and other MCP-compatible clients.
 
 ## Overview
@@ -225,26 +229,45 @@ See individual tool documentation in `/mcp/tools/`.
 
 ## Deployment
 
-### Create KV Namespace
+For complete deployment instructions, see [**docs/DEPLOYMENT.md**](./docs/DEPLOYMENT.md).
+
+Quick start:
 
 ```bash
-wrangler kv:namespace create CODEMAP_KV
-wrangler kv:namespace create CODEMAP_KV --preview
-```
+# 1. Authenticate with Cloudflare
+npx wrangler login
 
-Update `wrangler.toml` with the returned namespace IDs.
+# 2. Create KV namespace
+npx wrangler kv:namespace create CODEMAP_KV
+npx wrangler kv:namespace create CODEMAP_KV --preview
 
-### Deploy to Cloudflare
+# 3. Update wrangler.toml with the namespace IDs
 
-```bash
+# 4. Set API key secret
+npx wrangler secret put API_KEY
+
+# 5. Deploy
 npm run deploy
 ```
 
-### Set Secrets
+The worker will be available at: `https://codemap-mcp.<account-id>.workers.dev`
 
-```bash
-wrangler secret put API_KEY
-wrangler secret put API_KEY --env production
+### Claude Code Integration
+
+After deployment, configure Claude Code to use the MCP server. See [**docs/CLAUDE_CODE_SETUP.md**](./docs/CLAUDE_CODE_SETUP.md) for detailed integration instructions.
+
+Example configuration:
+
+```json
+{
+  "mcpServers": {
+    "codemap": {
+      "url": "https://codemap-mcp.<account-id>.workers.dev/mcp",
+      "transport": "http",
+      "apiKey": "YOUR_API_KEY"
+    }
+  }
+}
 ```
 
 ## Configuration
@@ -327,18 +350,54 @@ Run tests with verbose output:
 npm test -- --reporter=verbose
 ```
 
+## Testing
+
+### Unit Tests
+
+Run the test suite:
+
+```bash
+npm test
+```
+
+With coverage:
+
+```bash
+npm run test:coverage
+```
+
+### End-to-End Tests
+
+After deploying to Cloudflare or running locally, test all endpoints:
+
+```bash
+# Against local development server
+./scripts/e2e-test.sh http://localhost:8787 your-api-key
+
+# Against production deployment
+./scripts/e2e-test.sh https://codemap-mcp.<account-id>.workers.dev your-api-key
+```
+
+The test suite checks:
+- Health endpoints
+- MCP protocol compliance
+- All 4 MCP tools (get_dependents, get_impact_report, check_breaking_change, get_architecture)
+- Project upload and retrieval
+- Error handling and edge cases
+
 ## Development Roadmap
 
 - [x] 6.1.1 - Cloudflare Workers Project Setup
-- [ ] 6.1.2 - Hono Router and Health Endpoints
-- [ ] 6.1.3 - Cloudflare KV Integration
-- [ ] 6.2.1 - MCP Protocol Handler
-- [ ] 6.2.2 - MCP Tool: get_dependents
-- [ ] 6.2.3 - MCP Tool: get_impact_report
-- [ ] 6.2.4 - MCP Tool: check_breaking_change
-- [ ] 6.2.5 - MCP Tool: get_architecture
-- [ ] 6.3.1 - Project Upload REST API
-- [ ] 6.3.2 - Documentation & Examples
+- [x] 6.1.2 - Hono Router and Health Endpoints
+- [x] 6.1.3 - Cloudflare KV Integration
+- [x] 6.2.1 - MCP Protocol Handler
+- [x] 6.2.2 - MCP Tool: get_dependents
+- [x] 6.2.3 - MCP Tool: get_impact_report
+- [x] 6.2.4 - MCP Tool: check_breaking_change
+- [x] 6.2.5 - MCP Tool: get_architecture
+- [x] 6.3.1 - Project Upload REST API
+- [x] 6.3.2 - MCP Resource Endpoint
+- [x] 6.3.3 - Cloudflare Deployment and Testing
 
 ## Contributing
 
