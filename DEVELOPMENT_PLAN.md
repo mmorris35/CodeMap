@@ -115,9 +115,14 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 - [x] 6.3.2: MCP Resource Endpoint
 - [x] 6.3.3: Cloudflare Deployment and Testing
 
-**Current**: Phase 6 Complete - PRODUCTION DEPLOYED
+### Phase 7: Bugfixes & Enhancements
+- [ ] 7.1.1: Fix CLI Analyzer List Comprehension Bug
+- [ ] 7.1.2: Add /register Endpoint for API Key Self-Service
+- [ ] 7.1.3: Update Documentation with Registration Flow
+
+**Current**: Phase 7 - Bugfixes
 **Status**: CodeMap MCP Server live at https://codemap-mcp.mike-c63.workers.dev
-**Next**: Claude Code integration testing and client usage
+**Next**: Fix CLI analyzer bug and add API key registration
 
 ---
 
@@ -3991,6 +3996,196 @@ codemap://project/{id}/summary        → Text summary of architecture
 - **Account**: Cloudflare account c63896868c483d63a8f5508bd10da6c0 (Mike@mikemorris.net's Account)
 - **Branch**: main (directly deployed to production)
 - **Notes**: CodeMap MCP Server is now live and operational in production. The worker is fully functional and integrated with Cloudflare KV. Authentication via API keys works as designed (keys must be pre-registered in KV). All MCP tools error appropriately when projects are not found. Ready for Claude Code integration and client usage.
+
+---
+
+## Phase 7: Bugfixes & Enhancements
+
+**Goal**: Fix known bugs and add missing features for production usability
+**Duration**: 1-2 days
+
+### Task 7.1: Critical Fixes
+
+**Git**: Create branch `feature/7.1-bugfixes` when starting first subtask. Commit after each subtask. Squash merge to main when task complete.
+
+---
+
+**Subtask 7.1.1: Fix CLI Analyzer List Comprehension Bug (1-2 hours)**
+
+**Agent**: `codemap-executor` (Python CLI)
+
+**Prerequisites**:
+- None
+
+**Deliverables**:
+- [x] Read the pyan_wrapper.py to understand current scope handling
+- [x] Add handling for `listcomp`, `dictcomp`, `setcomp`, and `genexpr` scope types
+- [x] Wrap scope lookup in try/catch to gracefully handle unknown scope types
+- [x] Add warning log when encountering unknown scope types (don't fail)
+- [x] Add unit test with Python file containing list comprehension
+- [x] Add unit test with Python file containing dict comprehension
+- [x] Verify demo_project analyzes successfully after fix
+
+**Technology Decisions**:
+- Gracefully skip unknown scope types rather than failing entire analysis
+- Log warning for debugging but continue processing
+- Treat comprehension scopes as part of parent function scope
+
+**Files to Modify**:
+- `codemap/analyzer/pyan_wrapper.py` - Add scope type handling
+
+**Files to Create**:
+- `tests/analyzer/test_comprehensions.py` - Tests for comprehension handling
+
+**Success Criteria**:
+- [x] `codemap analyze` on demo_project completes without error
+- [x] CODE_MAP.json contains symbols from demo_project
+- [x] List comprehension warning logged but doesn't stop analysis
+- [x] All existing tests still pass
+- [x] New comprehension tests pass
+
+**Completion Notes**:
+- **Implementation**: Modified pyan_wrapper.py to gracefully handle comprehension scopes that pyan3 creates but doesn't properly register. The fix uses a two-stage approach: (1) Try to create visitor normally, and (2) If ValueError is raised for unknown scope, monkey-patch pyan3's ExecuteInInnerScope context manager to skip comprehension-related scopes instead of raising exceptions. When a comprehension scope is skipped, it's treated as part of the parent function scope, which is the correct semantic behavior. Warnings are logged for debugging but analysis continues. This handles listcomp, dictcomp, setcomp, and genexpr scope types.
+- **Files Created**:
+  - `tests/analyzer/test_comprehensions.py` - 226 lines, comprehensive test suite covering all comprehension types
+- **Files Modified**:
+  - `codemap/analyzer/pyan_wrapper.py` - Added _create_visitor() and _create_visitor_with_scope_patching() methods (203 additional lines)
+- **Tests**: 14 tests (7 existing + 7 new comprehension tests), 88% coverage in pyan_wrapper module
+- **Build**: ruff: pass, mypy: pass
+- **Branch**: feature/7.1-bugfixes
+- **Notes**: The fix properly handles the root cause of issue #2 - pyan3's handling of comprehension scopes. Demo project now analyzes successfully with 28 symbols extracted and 17 dependencies built. The monkey-patching approach was necessary because pyan3 raises ValueError before logging, so we catch the error and patch the context manager on retry.
+
+**Related Issue**: https://github.com/mmorris35/CodeMap/issues/2
+
+---
+
+**Subtask 7.1.2: Add /register Endpoint for API Key Self-Service (1-2 hours)**
+
+**Agent**: `codemap-mcp` (TypeScript MCP Server)
+
+**Prerequisites**:
+- None (can be done in parallel with 7.1.1)
+
+**Deliverables**:
+- [ ] Read `mcp-server/src/auth.ts` to understand key generation and hashing
+- [ ] Read `mcp-server/src/router.ts` to understand route structure
+- [ ] Create POST `/register` endpoint in router.ts
+- [ ] Generate new API key using `generateApiKey()` function
+- [ ] Hash the key and store in KV with `apikey:{hash}` prefix
+- [ ] Return the plaintext key to user (only time it's visible)
+- [ ] Add rate limiting: max 5 registrations per IP per hour
+- [ ] Add unit tests for register endpoint
+- [ ] Test registration flow end-to-end locally
+
+**Technology Decisions**:
+- No authentication required for registration (public endpoint)
+- Rate limit by IP address to prevent abuse
+- Return key only once - user must save it
+- Store creation timestamp with key for future expiration support
+
+**Endpoint Specification**:
+```
+POST /register
+Content-Type: application/json
+
+Request Body (optional):
+{
+  "name": "my-project"  // Optional friendly name
+}
+
+Response (201 Created):
+{
+  "api_key": "cm_abc123...",
+  "message": "Save this key - it cannot be retrieved again",
+  "created_at": "2024-12-20T12:00:00Z"
+}
+
+Response (429 Too Many Requests):
+{
+  "error": "Rate limit exceeded",
+  "message": "Maximum 5 registrations per hour",
+  "retry_after": 3600
+}
+```
+
+**Files to Modify**:
+- `mcp-server/src/router.ts` - Add /register route
+
+**Files to Create**:
+- `mcp-server/src/routes/register.ts` - Registration handler
+- `mcp-server/src/routes/register.test.ts` - Registration tests
+
+**Success Criteria**:
+- [ ] POST /register returns new API key
+- [ ] Key is stored in KV with hash
+- [ ] Subsequent requests with key authenticate successfully
+- [ ] Rate limiting prevents abuse (429 after 5 requests)
+- [ ] Unit tests cover success and rate limit cases
+- [ ] Integration test: register → upload → query works
+
+**Completion Notes**:
+- **Implementation**: (describe what was done)
+- **Files Created**: (list with line counts)
+- **Files Modified**: (list files)
+- **Tests**: (count and coverage)
+- **Build**: tsc: pass/fail, npm test: pass/fail
+- **Branch**: feature/7.1-bugfixes
+- **Notes**: (any additional context)
+
+---
+
+**Subtask 7.1.3: Update Documentation with Registration Flow (30 min - 1 hour)**
+
+**Agent**: `codemap-mcp` (TypeScript MCP Server - docs in mcp-server/)
+
+**Prerequisites**:
+- [x] 7.1.2: Add /register Endpoint for API Key Self-Service
+
+**Deliverables**:
+- [ ] Update mcp-server/README.md with registration instructions
+- [ ] Update mcp-server/docs/CLAUDE_CODE_SETUP.md with registration step
+- [ ] Update mcp-server/docs/DEPLOYMENT.md to mention self-service registration
+- [ ] Add curl example for registration to all docs
+- [ ] Remove references to manual API key setup where applicable
+
+**Documentation Updates**:
+```markdown
+## Getting Started
+
+1. Register for an API key:
+   ```bash
+   curl -X POST https://codemap-mcp.mike-c63.workers.dev/register
+   ```
+
+2. Save the returned API key securely
+
+3. Upload your CODE_MAP.json:
+   ```bash
+   curl -X POST \
+     -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d @CODE_MAP.json \
+     https://codemap-mcp.mike-c63.workers.dev/projects/my-project/code_map
+   ```
+```
+
+**Files to Modify**:
+- `mcp-server/README.md` - Add registration section
+- `mcp-server/docs/CLAUDE_CODE_SETUP.md` - Add registration step
+- `mcp-server/docs/DEPLOYMENT.md` - Update API key section
+
+**Success Criteria**:
+- [ ] README has clear registration instructions
+- [ ] CLAUDE_CODE_SETUP.md includes registration as first step
+- [ ] All curl examples use consistent format
+- [ ] No references to manual KV key insertion for users
+
+**Completion Notes**:
+- **Implementation**: (describe what was done)
+- **Files Modified**: (list files)
+- **Build**: N/A (documentation only)
+- **Branch**: feature/7.1-bugfixes
+- **Notes**: (any additional context)
 
 ---
 
