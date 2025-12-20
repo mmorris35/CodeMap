@@ -10,8 +10,8 @@ vars = { ENVIRONMENT = "production" }
 
 [[kv_namespaces]]
 binding = "CODEMAP_KV"
-id = "placeholder-will-be-created"
-preview_id = "placeholder-preview"
+id = "fd966d535f184c6b83e8378ce6da8bc3"
+preview_id = "91665409282341d690b113aeb956fb87"
 
 [build]
 command = "npm run build"
