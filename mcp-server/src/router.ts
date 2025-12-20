@@ -11,6 +11,7 @@ import type { Bindings, HealthResponse, APIInfoResponse } from "./types";
 import { handleMcpRequest } from "./mcp/handler";
 import { CodeMapStorage } from "./storage";
 import projectsRouter from "./routes/projects";
+import { validateApiKey } from "./auth";
 
 /**
  * Create and configure the Hono application
@@ -119,16 +120,28 @@ app.route("/projects", projectsRouter);
 /**
  * POST /mcp - MCP Protocol endpoint
  * Handles JSON-RPC 2.0 requests for MCP protocol
+ * Requires API key authentication via Bearer token in Authorization header
  *
  * @returns JSON-RPC 2.0 response
  */
 app.post("/mcp", async (c) => {
   try {
+    // Extract API key from Authorization header
+    const authHeader = c.req.header("Authorization");
+    const apiKey = authHeader?.replace("Bearer ", "");
+
+    // Validate API key and get user ID
+    const { valid, userId: validatedUserId } = await validateApiKey(
+      c.env.CODEMAP_KV,
+      apiKey,
+    );
+
+    // If API key is invalid, use anonymous user (for backward compatibility with unauthenticated requests)
+    // In production, you might want to require authentication
+    const userId = valid && validatedUserId ? validatedUserId : "anonymous";
+
     // Get request body
     const body = await c.req.text();
-
-    // For now, use a placeholder user ID (will be derived from API key in subtask 6.3.1)
-    const userId = "anonymous";
 
     // Create storage instance
     const storage = new CodeMapStorage(c.env.CODEMAP_KV);
