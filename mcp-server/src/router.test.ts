@@ -385,3 +385,70 @@ describe("Router - MCP Protocol Route", () => {
     expect(data.error.code).toBe(-32600);
   });
 });
+
+describe("Router - Registration Endpoint", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("POST /register generates and returns API key", async () => {
+    mockKV.get.mockResolvedValue(null);
+    mockKV.put.mockResolvedValue(undefined);
+
+    const request = new Request("http://localhost/register", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+
+    const response = await app.fetch(request, mockBindings);
+    const data = (await response.json()) as any;
+
+    expect(response.status).toBe(201);
+    expect(data.api_key).toBeDefined();
+    expect(data.api_key).toMatch(/^cm_/);
+    expect(data.message).toContain("cannot be retrieved again");
+    expect(data.created_at).toBeDefined();
+  });
+
+  it("POST /register includes /register in endpoints list", async () => {
+    const request = new Request("http://localhost/");
+    const response = await app.fetch(request, mockBindings);
+    const data = (await response.json()) as Record<string, unknown>;
+
+    expect(Array.isArray(data.endpoints)).toBe(true);
+    expect((data.endpoints as string[]).includes("/register")).toBe(true);
+  });
+
+  it("POST /register respects rate limiting on subsequent calls", async () => {
+    // First call - success
+    mockKV.get.mockResolvedValue(null);
+    mockKV.put.mockResolvedValue(undefined);
+
+    const request1 = new Request("http://localhost/register", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": "192.168.1.1" },
+    });
+
+    const response1 = await app.fetch(request1, mockBindings);
+    expect(response1.status).toBe(201);
+
+    // Second call - rate limit check will see existing count
+    mockKV.get.mockResolvedValue(
+      JSON.stringify({
+        count: 5,
+        resetTime: Date.now() + 3600000,
+      }),
+    );
+
+    const request2 = new Request("http://localhost/register", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": "192.168.1.1" },
+    });
+
+    const response2 = await app.fetch(request2, mockBindings);
+    expect(response2.status).toBe(429);
+
+    const data = (await response2.json()) as any;
+    expect(data.error).toBe("Rate limit exceeded");
+  });
+});

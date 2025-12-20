@@ -11,6 +11,7 @@ import type { Bindings, HealthResponse, APIInfoResponse } from "./types";
 import { handleMcpRequest } from "./mcp/handler";
 import { CodeMapStorage } from "./storage";
 import projectsRouter from "./routes/projects";
+import { handleRegister } from "./routes/register";
 import { validateApiKey } from "./auth";
 
 /**
@@ -60,7 +61,7 @@ app.get("/", (c) => {
   const response: APIInfoResponse = {
     name: "CodeMap MCP Server",
     version: "1.0.0",
-    endpoints: ["/health", "/health/ready", "/mcp", "/projects"],
+    endpoints: ["/health", "/health/ready", "/register", "/mcp", "/projects"],
     environment: c.env.ENVIRONMENT,
   };
   return c.json(response);
@@ -110,6 +111,14 @@ app.get("/health/ready", async (c) => {
     return c.json(response, 503);
   }
 });
+
+/**
+ * POST /register - API key self-service registration
+ * Public endpoint (no authentication required)
+ * Rate-limited to 5 registrations per IP per hour
+ * Returns new API key that user must save (only time it's visible)
+ */
+app.post("/register", handleRegister);
 
 /**
  * Mount projects router at /projects
