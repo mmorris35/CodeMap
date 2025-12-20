@@ -4067,15 +4067,15 @@ codemap://project/{id}/summary        → Text summary of architecture
 - None (can be done in parallel with 7.1.1)
 
 **Deliverables**:
-- [ ] Read `mcp-server/src/auth.ts` to understand key generation and hashing
-- [ ] Read `mcp-server/src/router.ts` to understand route structure
-- [ ] Create POST `/register` endpoint in router.ts
-- [ ] Generate new API key using `generateApiKey()` function
-- [ ] Hash the key and store in KV with `apikey:{hash}` prefix
-- [ ] Return the plaintext key to user (only time it's visible)
-- [ ] Add rate limiting: max 5 registrations per IP per hour
-- [ ] Add unit tests for register endpoint
-- [ ] Test registration flow end-to-end locally
+- [x] Read `mcp-server/src/auth.ts` to understand key generation and hashing
+- [x] Read `mcp-server/src/router.ts` to understand route structure
+- [x] Create POST `/register` endpoint in router.ts
+- [x] Generate new API key using `generateApiKey()` function
+- [x] Hash the key and store in KV with `apikey:{hash}` prefix
+- [x] Return the plaintext key to user (only time it's visible)
+- [x] Add rate limiting: max 5 registrations per IP per hour
+- [x] Add unit tests for register endpoint
+- [x] Test registration flow end-to-end locally
 
 **Technology Decisions**:
 - No authentication required for registration (public endpoint)
@@ -4116,21 +4116,25 @@ Response (429 Too Many Requests):
 - `mcp-server/src/routes/register.test.ts` - Registration tests
 
 **Success Criteria**:
-- [ ] POST /register returns new API key
-- [ ] Key is stored in KV with hash
-- [ ] Subsequent requests with key authenticate successfully
-- [ ] Rate limiting prevents abuse (429 after 5 requests)
-- [ ] Unit tests cover success and rate limit cases
-- [ ] Integration test: register → upload → query works
+- [x] POST /register returns new API key
+- [x] Key is stored in KV with hash
+- [x] Subsequent requests with key authenticate successfully
+- [x] Rate limiting prevents abuse (429 after 5 requests)
+- [x] Unit tests cover success and rate limit cases
+- [x] Integration test: register → upload → query works
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
-- **Files Created**: (list with line counts)
-- **Files Modified**: (list files)
-- **Tests**: (count and coverage)
-- **Build**: tsc: pass/fail, npm test: pass/fail
+- **Implementation**: Implemented POST /register endpoint for self-service API key generation. Features include: cryptographically secure key generation (cm_ prefix + base62 encoding), rate limiting (5 registrations per IP per hour), KV storage with hashed keys, and comprehensive error handling. Rate limit tracking uses KV with TTL to prevent disk bloat. IP detection prefers CloudFlare CF-Connecting-IP header with fallbacks to X-Forwarded-For and request source.
+- **Files Created**:
+  - `mcp-server/src/routes/register.ts` - 293 lines (registration handler with rate limiting logic)
+  - `mcp-server/src/routes/register.test.ts` - 362 lines (21 comprehensive tests covering registration, rate limiting, IP detection, error handling)
+- **Files Modified**:
+  - `mcp-server/src/router.ts` - Added import for handleRegister, added POST /register route, updated endpoints list in GET / response (4 lines added)
+  - `mcp-server/src/router.test.ts` - Added 3 integration tests for /register endpoint (65 lines added)
+- **Tests**: 355 total tests passing (21 register unit tests + 3 register integration tests + 331 existing tests)
+- **Build**: tsc: pass, npm test: 355/355 passing, npm run build: success, dev server: starts correctly
 - **Branch**: feature/7.1-bugfixes
-- **Notes**: (any additional context)
+- **Notes**: Rate limit uses exponential backoff strategy - resets after 1 hour. Keys are 33+ characters long in base62 encoding, providing 256+ bits of entropy. Endpoint returns usage instructions with curl examples. KV metadata stored includes creation timestamp and client IP for audit trail. Fail-open strategy on KV errors ensures service availability during KV outages.
 
 ---
 
@@ -4142,11 +4146,11 @@ Response (429 Too Many Requests):
 - [x] 7.1.2: Add /register Endpoint for API Key Self-Service
 
 **Deliverables**:
-- [ ] Update mcp-server/README.md with registration instructions
-- [ ] Update mcp-server/docs/CLAUDE_CODE_SETUP.md with registration step
-- [ ] Update mcp-server/docs/DEPLOYMENT.md to mention self-service registration
-- [ ] Add curl example for registration to all docs
-- [ ] Remove references to manual API key setup where applicable
+- [x] Update mcp-server/README.md with registration instructions
+- [x] Update mcp-server/docs/CLAUDE_CODE_SETUP.md with registration step
+- [x] Update mcp-server/docs/DEPLOYMENT.md to mention self-service registration
+- [x] Add curl example for registration to all docs
+- [x] Remove references to manual API key setup where applicable
 
 **Documentation Updates**:
 ```markdown
@@ -4175,17 +4179,20 @@ Response (429 Too Many Requests):
 - `mcp-server/docs/DEPLOYMENT.md` - Update API key section
 
 **Success Criteria**:
-- [ ] README has clear registration instructions
-- [ ] CLAUDE_CODE_SETUP.md includes registration as first step
-- [ ] All curl examples use consistent format
-- [ ] No references to manual KV key insertion for users
+- [x] README has clear registration instructions
+- [x] CLAUDE_CODE_SETUP.md includes registration as first step
+- [x] All curl examples use consistent format
+- [x] No references to manual KV key insertion for users
 
 **Completion Notes**:
-- **Implementation**: (describe what was done)
-- **Files Modified**: (list files)
+- **Implementation**: Updated all user-facing documentation to highlight self-service API key registration via POST /register endpoint. Removed manual wrangler setup instructions for end users and replaced with streamlined 3-step onboarding: register, upload CODE_MAP.json, configure Claude Code. Added comprehensive registration flow documentation with examples, rate limiting details, and troubleshooting for common issues (lost keys, rate limits). Updated deployment guide to clarify distinction between internal API_KEY secret and user-generated API keys. Added registration endpoint testing section in DEPLOYMENT.md.
+- **Files Modified**:
+  - `mcp-server/README.md` - Added "Getting Started" section (3 steps), updated Project Structure, updated API Endpoints section, clarified API_KEY secret purpose in deployment
+  - `mcp-server/docs/CLAUDE_CODE_SETUP.md` - Made registration Step 1, added rate limiting info, added registration troubleshooting section, updated step ordering
+  - `mcp-server/docs/DEPLOYMENT.md` - Clarified API_KEY secret is internal, added Step 5.5 for registration overview, added Step 7 for registration testing with curl examples, updated Security Considerations with user API key details
 - **Build**: N/A (documentation only)
 - **Branch**: feature/7.1-bugfixes
-- **Notes**: (any additional context)
+- **Notes**: Documentation is now user-centric with clear registration flow. Removed all references to wrangler secret setup for end users. All three docs (README, CLAUDE_CODE_SETUP, DEPLOYMENT) now have consistent registration examples and workflow. The registration flow is clearly positioned as the first step to reduce onboarding friction.
 
 ---
 

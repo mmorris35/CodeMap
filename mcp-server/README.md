@@ -28,6 +28,64 @@ CodeMap MCP Server exposes CODE_MAP.json dependency data as MCP tools, allowing 
 - Cloudflare account (free tier works)
 - Wrangler CLI installed globally: `npm install -g wrangler`
 
+## Getting Started
+
+### 1. Register for an API Key
+
+New users can self-register for an API key without manual setup:
+
+```bash
+curl -X POST https://codemap-mcp.mike-c63.workers.dev/register
+```
+
+Response:
+
+```json
+{
+  "api_key": "cm_abc123...",
+  "message": "Save this key - it cannot be retrieved again",
+  "created_at": "2024-12-20T12:00:00Z"
+}
+```
+
+Save the returned `api_key` securely - it cannot be retrieved again if lost.
+
+### 2. Upload Your CODE_MAP.json
+
+Generate your project's CODE_MAP.json (see [CodeMap CLI documentation](../)) and upload it:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @CODE_MAP.json \
+  https://codemap-mcp.mike-c63.workers.dev/projects/my-project/code_map
+```
+
+Replace `YOUR_API_KEY` with the key from Step 1 and `my-project` with your project name.
+
+### 3. Start Using the Tools
+
+Configure Claude Code (see [CLAUDE_CODE_SETUP.md](./docs/CLAUDE_CODE_SETUP.md)) and start analyzing dependencies:
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_dependents",
+      "arguments": {
+        "project_id": "my-project",
+        "symbol": "module.function"
+      }
+    }
+  }' \
+  https://codemap-mcp.mike-c63.workers.dev/mcp
+```
+
 ## Local Development
 
 ### Setup
@@ -45,10 +103,17 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-3. Update `.dev.vars` with your API key:
+3. For local development, generate a test API key:
 
 ```bash
-API_KEY=your-dev-api-key
+# Generate a secure random key for testing
+node -e "console.log('cm_' + require('crypto').randomBytes(24).toString('base64').replace(/[+/]/g, m => m === '+' ? '-' : '_').substring(0, 30))"
+```
+
+Update `.dev.vars` with the generated key:
+
+```bash
+API_KEY=cm_your-generated-key
 ENVIRONMENT=development
 ```
 
@@ -111,11 +176,15 @@ npm run test:coverage
 mcp-server/
 ├── src/
 │   ├── index.ts                  # Worker entry point
-│   ├── router.ts                 # Hono app with routes (TODO: 6.1.2)
-│   ├── types.ts                  # Shared TypeScript types (TODO: 6.1.2)
-│   ├── storage.ts                # KV wrapper (TODO: 6.1.3)
-│   ├── storage.test.ts           # Storage tests (TODO: 6.1.3)
-│   └── mcp/                      # MCP protocol implementation (TODO: Phase 6.2)
+│   ├── router.ts                 # Hono app with routes
+│   ├── types.ts                  # Shared TypeScript types
+│   ├── storage.ts                # KV wrapper
+│   ├── storage.test.ts           # Storage tests
+│   ├── auth.ts                   # API key generation and hashing
+│   ├── routes/
+│   │   ├── register.ts           # Self-service API key registration
+│   │   └── register.test.ts      # Registration endpoint tests
+│   └── mcp/                      # MCP protocol implementation
 │       ├── handler.ts
 │       ├── types.ts
 │       ├── resources.ts
@@ -124,6 +193,9 @@ mcp-server/
 │           ├── get-impact-report.ts
 │           ├── check-breaking-change.ts
 │           └── get-architecture.ts
+├── docs/
+│   ├── DEPLOYMENT.md             # Deployment guide
+│   └── CLAUDE_CODE_SETUP.md      # Claude Code integration guide
 ├── package.json
 ├── tsconfig.json
 ├── wrangler.toml
@@ -165,10 +237,32 @@ Response:
 {
   "name": "CodeMap MCP Server",
   "version": "1.0.0",
-  "endpoints": ["/health", "/health/ready", "/mcp", "/projects"],
+  "endpoints": ["/health", "/health/ready", "/register", "/mcp", "/projects"],
   "environment": "development"
 }
 ```
+
+### Register for API Key
+
+**POST /register**
+
+Self-service API key registration (no authentication required):
+
+```bash
+curl -X POST https://codemap-mcp.mike-c63.workers.dev/register
+```
+
+Response:
+
+```json
+{
+  "api_key": "cm_abc123...",
+  "message": "Save this key - it cannot be retrieved again",
+  "created_at": "2024-12-20T12:00:00Z"
+}
+```
+
+Rate limiting: Maximum 5 registrations per IP per hour. Exceeding this returns 429 Too Many Requests.
 
 ### MCP Protocol
 
@@ -180,7 +274,7 @@ Send JSON-RPC 2.0 requests following the MCP specification. See [MCP Protocol Im
 
 **POST /projects/{project_id}/code_map**
 
-Upload a CODE_MAP.json file:
+Upload a CODE_MAP.json file (requires API key):
 
 ```bash
 curl -X POST \
@@ -243,7 +337,7 @@ npx wrangler kv:namespace create CODEMAP_KV --preview
 
 # 3. Update wrangler.toml with the namespace IDs
 
-# 4. Set API key secret
+# 4. Set API key secret (used for the /register endpoint)
 npx wrangler secret put API_KEY
 
 # 5. Deploy
@@ -251,6 +345,12 @@ npm run deploy
 ```
 
 The worker will be available at: `https://codemap-mcp.<account-id>.workers.dev`
+
+After deployment, users can self-register for API keys:
+
+```bash
+curl -X POST https://codemap-mcp.<account-id>.workers.dev/register
+```
 
 ### Claude Code Integration
 

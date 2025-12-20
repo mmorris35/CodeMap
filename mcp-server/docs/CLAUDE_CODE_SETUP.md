@@ -17,22 +17,39 @@ These tools help Claude Code understand codebase structure before making changes
 
 1. **Claude Code** (CLI tool for making code changes)
 2. **CodeMap MCP Server deployed** (see [DEPLOYMENT.md](./DEPLOYMENT.md))
-3. **API Key** for the deployed MCP server
-4. **CODE_MAP.json** uploaded for your project
+3. **CODE_MAP.json** uploaded for your project
 
-## Step 1: Get the MCP Server URL
+## Step 1: Register for an API Key
 
-From the deployment, you have a URL like:
-
-```
-https://codemap-mcp.<account-id>.workers.dev
-```
-
-And an API key that was set via:
+Self-register to get an API key (no manual setup required):
 
 ```bash
-wrangler secret put API_KEY
+curl -X POST https://codemap-mcp.mike-c63.workers.dev/register
 ```
+
+Response:
+
+```json
+{
+  "api_key": "cm_abc123def456...",
+  "message": "Save this key - it cannot be retrieved again",
+  "created_at": "2024-12-20T12:00:00Z"
+}
+```
+
+**Important**: Save the API key immediately - it cannot be retrieved again if lost.
+
+If you're using a different deployment URL:
+
+```bash
+curl -X POST https://codemap-mcp.<your-account-id>.workers.dev/register
+```
+
+### Rate Limiting
+
+The /register endpoint has rate limiting to prevent abuse:
+- Maximum 5 registrations per IP address per hour
+- If you exceed this limit, wait 1 hour before trying again
 
 ## Step 2: Find Claude Code Configuration File
 
@@ -51,6 +68,8 @@ Claude Code uses a configuration file at:
 If the file doesn't exist, create it.
 
 ## Step 3: Add MCP Server Configuration
+
+Use the API key from Step 1 and the production URL (`https://codemap-mcp.mike-c63.workers.dev`) or your custom deployment URL.
 
 Add or update the `mcpServers` section in `claude.json`:
 
@@ -90,21 +109,30 @@ Add or update the `mcpServers` section in `claude.json`:
 
 ## Step 4: Upload CODE_MAP.json for Your Project
 
-Before using the MCP server with Claude Code, you need to upload your project's CODE_MAP.json:
+Before using the MCP server with Claude Code, you need to upload your project's CODE_MAP.json.
+
+First, generate it from your project root:
 
 ```bash
-# Generate CODE_MAP.json for your project (from project root)
 codemap analyze --output CODE_MAP.json
+```
 
-# Upload to the MCP server
+Then upload it using the API key from Step 1:
+
+```bash
 curl -X POST \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d @CODE_MAP.json \
-  https://codemap-mcp.<account-id>.workers.dev/projects/my-project/code_map
+  https://codemap-mcp.mike-c63.workers.dev/projects/my-project/code_map
 ```
 
-The `project_id` (here `my-project`) is used when making MCP requests. Use something descriptive like your project name or repository name.
+Replace:
+- `YOUR_API_KEY` with the key from Step 1
+- `my-project` with a descriptive project ID (used in MCP requests)
+- URL with your deployment URL if not using the default
+
+The `project_id` is used when making MCP requests. Use something descriptive like your project name or repository name.
 
 ## Step 5: Test the Integration
 
@@ -141,7 +169,7 @@ curl -X POST \
 
 Expected response includes all 4 tools with schemas.
 
-## Step 6: Use with Claude Code
+## Step 6: Using Claude Code with the MCP Server
 
 Once configured, Claude Code can use the tools directly. For example:
 
@@ -371,6 +399,34 @@ Here's how Claude Code would use these tools in practice:
 
 ## Troubleshooting
 
+### Cannot register for API key
+
+If the /register endpoint returns an error:
+
+**429 Too Many Requests:**
+```json
+{
+  "error": "Rate limit exceeded",
+  "message": "Maximum 5 registrations per hour",
+  "retry_after": 3600
+}
+```
+
+Solution: Wait 1 hour and try again. Each IP address is limited to 5 registrations per hour.
+
+**Other errors:**
+1. Verify the deployment URL is correct: `curl https://codemap-mcp.mike-c63.workers.dev/health`
+2. Check that the server is deployed: `npx wrangler tail` (view logs)
+3. Ensure API_KEY secret is set: `npx wrangler secret list`
+
+### Lost API key
+
+API keys cannot be retrieved after registration. If you lose your key:
+
+1. Register again from a different IP address or wait 1 hour
+2. Use the new API key for future requests
+3. Old API key will stop working (no grace period)
+
 ### MCP Server not responding
 
 1. Check deployment: `curl https://codemap-mcp.<account-id>.workers.dev/health`
@@ -466,10 +522,11 @@ If using a custom domain (see [DEPLOYMENT.md](./DEPLOYMENT.md)):
 
 ## Next Steps
 
-1. Configure Claude Code with the setup from Step 2-3
-2. Upload your project's CODE_MAP.json (Step 4)
-3. Test with sample queries (Step 5)
-4. Start using Claude Code with the MCP server
+1. Register for an API key (Step 1)
+2. Configure Claude Code with the setup from Step 2-3
+3. Upload your project's CODE_MAP.json (Step 4)
+4. Test with sample queries (Step 5)
+5. Start using Claude Code with the MCP server
 
 ## Support and Feedback
 

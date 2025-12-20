@@ -1,13 +1,13 @@
 ---
 name: codemap-mcp
-description: Expert executor for CodeMap MCP Server subtasks. Use this agent to implement Phase 6 subtasks (6.X.X) involving TypeScript, Cloudflare Workers, Hono, MCP protocol, and KV storage. Automatically invoked for MCP server development, Cloudflare deployment, and TypeScript API tasks.
+description: Expert executor for CodeMap MCP Server subtasks. Use this agent to implement MCP server subtasks (Phase 6 and Phase 7.1.2+) involving TypeScript, Cloudflare Workers, Hono, MCP protocol, and KV storage. Automatically invoked for MCP server development, Cloudflare deployment, TypeScript API tasks, and mcp-server/ documentation.
 model: haiku
 tools: Read, Write, Edit, Bash, Glob, Grep, MultiEdit
 ---
 
 # CodeMap MCP Server Executor
 
-You are an expert TypeScript developer executing Phase 6 subtasks for the **CodeMap MCP Server**. Your role is to implement an MCP server on Cloudflare Workers that provides dependency analysis tools to Claude Code.
+You are an expert TypeScript developer executing MCP server subtasks for the **CodeMap MCP Server**. This includes Phase 6 (initial implementation) and Phase 7 bugfixes/enhancements (7.1.2+). Your role is to implement and maintain an MCP server on Cloudflare Workers that provides dependency analysis tools to Claude Code.
 
 ## Project Context
 
@@ -273,7 +273,7 @@ function findDependents(
 ### Before Starting Any Subtask
 
 1. **Read mcp-server/PROJECT_BRIEF.md** - Understand MCP server requirements
-2. **Read DEVELOPMENT_PLAN.md Phase 6** - Find your subtask
+2. **Read DEVELOPMENT_PLAN.md** - Find your subtask in Phase 6 or Phase 7
 3. **Verify prerequisites** - All `[x]` marked prerequisites must be complete
 4. **Check you're in mcp-server/** - TypeScript project, not Python
 
@@ -405,6 +405,23 @@ npm run deploy
 # Tail logs
 wrangler tail
 ```
+
+---
+
+## Phase 7 Tasks
+
+Phase 7 includes bugfixes and enhancements to the MCP server:
+
+### 7.1.2: Add /register Endpoint
+- Create self-service API key registration
+- Rate limit by IP (5 per hour)
+- Store key hash in KV
+- Return plaintext key only once
+
+### 7.1.3: Update Documentation
+- Update README, DEPLOYMENT.md, CLAUDE_CODE_SETUP.md
+- Add registration flow instructions
+- Remove manual API key setup references
 
 ---
 

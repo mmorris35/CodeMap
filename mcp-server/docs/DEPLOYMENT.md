@@ -60,17 +60,17 @@ Replace the placeholder IDs with the values from Step 2.
 
 ## Step 4: Set API Key Secret
 
-Set the API_KEY secret that clients must provide in requests:
+Set the API_KEY secret used by the /register endpoint to generate new API keys:
 
 ```bash
 cd mcp-server
 npx wrangler secret put API_KEY
 ```
 
-Wrangler will prompt you to enter the secret value. Use a strong random string:
+Wrangler will prompt you to enter the secret value. This secret is used internally by the /register endpoint - users do not need to know it. Use a strong random string:
 
 ```bash
-# Generate a secure API key (example)
+# Generate a secure secret (example)
 openssl rand -base64 32
 ```
 
@@ -79,6 +79,8 @@ Also set it for the production environment:
 ```bash
 npx wrangler secret put API_KEY --env production
 ```
+
+**Note**: This is different from user API keys. The API_KEY secret is internal to the server and used to authenticate the /register endpoint for generating user API keys.
 
 ## Step 5: Deploy to Cloudflare
 
@@ -98,6 +100,18 @@ https://codemap-mcp.<account-id>.workers.dev
 ```
 
 Save the deployment URL - you'll need it for testing and Claude Code integration.
+
+## Step 5.5: Enable Self-Service API Key Registration
+
+The /register endpoint is now available for users to self-register for API keys without needing manual setup via wrangler.
+
+Users can register by making a POST request:
+
+```bash
+curl -X POST https://codemap-mcp.<account-id>.workers.dev/register
+```
+
+This removes the burden of distributing API keys - users can generate their own. Each IP is rate-limited to 5 registrations per hour.
 
 ## Step 6: Verify Deployment
 
@@ -131,7 +145,50 @@ Expected response (200 OK):
 }
 ```
 
-## Step 7: Test MCP Protocol
+## Step 7: Test Registration Endpoint
+
+Test the /register endpoint to verify API key generation works:
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  https://codemap-mcp.<account-id>.workers.dev/register
+```
+
+Expected response (201 Created):
+
+```json
+{
+  "api_key": "cm_...",
+  "message": "Save this key - it cannot be retrieved again",
+  "created_at": "2024-12-20T12:00:00Z"
+}
+```
+
+Save the returned API key for testing.
+
+### Test Rate Limiting
+
+The /register endpoint rate-limits requests to prevent abuse. Call it 6 times quickly from the same IP to trigger rate limiting:
+
+```bash
+# This should return 429 Too Many Requests after 5 calls
+for i in {1..6}; do
+  curl -X POST https://codemap-mcp.<account-id>.workers.dev/register
+done
+```
+
+Expected 429 response:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "message": "Maximum 5 registrations per hour",
+  "retry_after": 3600
+}
+```
+
+## Step 8: Test MCP Protocol
 
 Test the MCP endpoint with a tools/list request:
 
@@ -166,9 +223,9 @@ Expected response:
 }
 ```
 
-## Step 8: Upload Test CODE_MAP.json
+## Step 9: Upload Test CODE_MAP.json
 
-Upload a test project CODE_MAP.json:
+Use the API key from Step 7 to upload a test project CODE_MAP.json:
 
 ```bash
 curl -X POST \
@@ -189,7 +246,7 @@ Response:
 }
 ```
 
-## Step 9: Test All MCP Tools
+## Step 10: Test All MCP Tools
 
 ### Test get_dependents
 
@@ -400,19 +457,28 @@ npx wrangler secret put API_KEY --env production
 ## Security Considerations
 
 1. **API Key Management**:
-   - Store API_KEY in Cloudflare secrets, not in code
-   - Rotate keys periodically
-   - Use unique keys per client/integration
+   - The `API_KEY` secret (from Step 4) is internal to the server and is NOT distributed to users
+   - Users generate their own API keys via the /register endpoint
+   - User-generated API keys are stored as salted hashes in KV for security
+   - User API keys cannot be retrieved from the server after creation
+   - Rotate the internal `API_KEY` secret periodically
 
-2. **CORS**:
+2. **User API Key Generation**:
+   - Users can self-register without contacting administrators
+   - Rate limiting (5 per IP per hour) prevents abuse
+   - Each key is cryptographically secure (256+ bits entropy)
+   - Keys are prefixed with `cm_` for identification
+   - Lost keys cannot be recovered - users must register again
+
+3. **CORS**:
    - Currently allows all origins (see `mcp-server/src/router.ts`)
    - Consider restricting in production to known origins
 
-3. **Rate Limiting**:
-   - Not implemented (use Cloudflare WAF for this)
-   - Consider adding per-user rate limits in future
+4. **Rate Limiting**:
+   - Implemented on /register endpoint (5 per IP per hour)
+   - Consider using Cloudflare WAF for additional rate limiting on other endpoints
 
-4. **Data Privacy**:
+5. **Data Privacy**:
    - CODE_MAP.json contains only code structure (no PII)
    - User data isolated via API key hashing
    - KV data encrypted at rest by Cloudflare
