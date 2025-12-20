@@ -60,10 +60,8 @@ class PyanAnalyzer:
             )
             # Try to import pyan here to allow graceful degradation
             try:
-                from pyan import CallGraphVisitor
-
                 file_strings = [str(f.absolute()) for f in filtered_files]
-                visitor = CallGraphVisitor(file_strings, logger=logger)
+                visitor = self._create_visitor(file_strings)
 
                 # Extract graph information
                 nodes = {}
@@ -155,3 +153,155 @@ class PyanAnalyzer:
             if pattern in path_str:
                 return True
         return False
+
+    def _create_visitor(self, file_strings: list[str]) -> Any:
+        """Create a CallGraphVisitor with graceful handling of comprehension scopes.
+
+        Wraps the creation of CallGraphVisitor to gracefully handle unknown scope
+        types (listcomp, dictcomp, setcomp, genexpr) that pyan3 creates but may
+        not properly register. These scopes are treated as part of their parent
+        function scope.
+
+        Args:
+            file_strings: List of absolute file paths to analyze.
+
+        Returns:
+            CallGraphVisitor instance with scope error handling.
+
+        Raises:
+            ImportError: If pyan3 is not available.
+        """
+        from pyan import CallGraphVisitor
+
+        try:
+            visitor = CallGraphVisitor(file_strings, logger=logger)
+            return visitor
+        except ValueError as value_error:
+            # If we get a ValueError about unknown scopes, patch and try again
+            if "Unknown scope" in str(value_error):
+                logger.warning(
+                    "pyan3 encountered unknown scope error while analyzing: %s",
+                    value_error,
+                )
+                # Try again with a patched CallGraphVisitor that ignores these errors
+                return self._create_visitor_with_scope_patching(file_strings)
+            raise
+
+    def _create_visitor_with_scope_patching(self, file_strings: list[str]) -> Any:
+        """Create CallGraphVisitor with monkey-patched scope error handling.
+
+        As a fallback when the logger approach doesn't prevent the error,
+        this patches the CallGraphVisitor's scope lookup to gracefully skip
+        unknown comprehension scopes.
+
+        Args:
+            file_strings: List of absolute file paths to analyze.
+
+        Returns:
+            CallGraphVisitor instance with patched scope handling.
+
+        Raises:
+            ImportError: If pyan3 is not available.
+        """
+        from pyan import CallGraphVisitor, anutils
+
+        # Store the original methods
+        original_context_enter = anutils.ExecuteInInnerScope.__enter__
+        original_context_exit = anutils.ExecuteInInnerScope.__exit__
+
+        # Track which scopes we skipped to handle exit properly
+        skipped_scopes: set[int] = set()
+
+        def patched_enter(scope_context_self):  # type: ignore
+            """Patched __enter__ that handles unknown scopes gracefully.
+
+            Args:
+                scope_context_self: The ExecuteInInnerScope instance.
+
+            Returns:
+                The ExecuteInInnerScope instance (self).
+
+            Raises:
+                ValueError: If scope is unknown but not a comprehension type.
+            """
+            analyzer = scope_context_self.analyzer
+            scopename = scope_context_self.scopename
+
+            analyzer.name_stack.append(scopename)
+            inner_ns = analyzer.get_node_of_current_namespace().get_name()
+
+            # Check if this is an unknown comprehension scope
+            scope_types = ["listcomp", "dictcomp", "setcomp", "genexpr"]
+            is_comprehension = any(scope_type in inner_ns for scope_type in scope_types)
+
+            if inner_ns not in analyzer.scopes:
+                if is_comprehension:
+                    # Log warning and skip this scope
+                    logger.warning(
+                        "Skipping unknown comprehension scope (treating as "
+                        "part of parent scope): %s",
+                        inner_ns,
+                    )
+                    # Mark this scope as skipped so __exit__ knows not to pop stacks
+                    skipped_scopes.add(id(scope_context_self))
+                    # Don't push scope_stack, but do push context_stack for tracking
+                    analyzer.context_stack.append(scopename)
+                    return scope_context_self
+
+                # For non-comprehension unknown scopes, raise the original error
+                analyzer.name_stack.pop()
+                raise ValueError("Unknown scope '%s'" % (inner_ns))
+
+            # Normal case: scope exists, proceed as usual
+            analyzer.scope_stack.append(analyzer.scopes[inner_ns])
+            analyzer.context_stack.append(scopename)
+            return scope_context_self
+
+        def patched_exit(scope_context_self, errtype, errvalue, traceback):  # type: ignore
+            """Patched __exit__ that handles skipped scopes properly.
+
+            Args:
+                scope_context_self: The ExecuteInInnerScope instance.
+                errtype: Exception type or None.
+                errvalue: Exception value or None.
+                traceback: Traceback object or None.
+            """
+            analyzer = scope_context_self.analyzer
+            scopename = scope_context_self.scopename
+
+            # Check if this scope was skipped
+            scope_id = id(scope_context_self)
+            was_skipped = scope_id in skipped_scopes
+            if was_skipped:
+                skipped_scopes.discard(scope_id)
+
+            # Only pop from stacks if we didn't skip this scope
+            if not was_skipped:
+                analyzer.scope_stack.pop()
+
+            # Always pop context and name
+            analyzer.context_stack.pop()
+            analyzer.name_stack.pop()
+
+            # For non-skipped scopes, add the defines edge (original behavior)
+            if not was_skipped:
+                from pyan.anutils import Flavor
+
+                from_node = analyzer.get_node_of_current_namespace()
+                ns = from_node.get_name()
+                to_node = analyzer.get_node(ns, scopename, None, flavor=Flavor.NAMESPACE)
+                if analyzer.add_defines_edge(from_node, to_node):
+                    analyzer.logger.info("Def from %s to %s %s" % (from_node, scopename, to_node))
+                analyzer.last_value = to_node
+
+        # Monkey-patch both methods
+        anutils.ExecuteInInnerScope.__enter__ = patched_enter
+        anutils.ExecuteInInnerScope.__exit__ = patched_exit
+
+        try:
+            visitor = CallGraphVisitor(file_strings, logger=logger)
+            return visitor
+        finally:
+            # Restore the original methods
+            anutils.ExecuteInInnerScope.__enter__ = original_context_enter
+            anutils.ExecuteInInnerScope.__exit__ = original_context_exit
