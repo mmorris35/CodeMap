@@ -162,7 +162,7 @@ def analyze_command(
         for file_path in config.source_dir.rglob("*.py"):
             # Skip excluded patterns
             skip = False
-            for pattern in config.exclude_patterns:
+            for pattern in config.exclude_patterns or []:
                 if pattern in str(file_path):
                     skip = True
                     break
