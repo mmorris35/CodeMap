@@ -15,10 +15,21 @@ logger = get_logger(__name__)
 
 
 @dataclass
+class SymbolMetadata:
+    """Metadata for a symbol extracted from AST."""
+
+    qualified_name: str
+    kind: str  # "module", "class", "function", "method"
+    file: Path
+    line: int
+    docstring: str | None = None
+
+
+@dataclass
 class CallGraph:
     """Result of code analysis."""
 
-    nodes: dict[str, Any] = field(default_factory=dict)
+    nodes: dict[str, SymbolMetadata] = field(default_factory=dict)
     edges: list[tuple[str, str]] = field(default_factory=list)
     files_analyzed: list[Path] = field(default_factory=list)
 
@@ -44,7 +55,7 @@ class PyanAnalyzer:
             file_paths: List of Python files to analyze.
 
         Returns:
-            CallGraph containing nodes and edges.
+            CallGraph containing nodes and edges with metadata.
         """
         # Filter files by exclusion patterns
         filtered_files = self._filter_files(file_paths)
@@ -60,49 +71,65 @@ class PyanAnalyzer:
             )
             # Try to import pyan here to allow graceful degradation
             try:
+                from pyan.anutils import Flavor
+
                 file_strings = [str(f.absolute()) for f in filtered_files]
                 visitor = self._create_visitor(file_strings)
 
-                # Extract graph information
-                nodes = {}
-                edges = []
+                # Extract graph information with metadata
+                nodes: dict[str, SymbolMetadata] = {}
+                edges: list[tuple[str, str]] = []
 
-                # Extract nodes from pyan's nodes dict
+                # Extract nodes from pyan's nodes dict with metadata
                 # pyan stores: nodes[key] = [<Node kind:name>, ...]
                 if hasattr(visitor, "nodes"):
                     for key, node_list in visitor.nodes.items():
                         for node in node_list:
-                            node_str = str(node)
                             # Only include function, class, method, and module nodes
-                            if any(
-                                kind in node_str
-                                for kind in ["function:", "class:", "method:", "module:"]
+                            if node.flavor in (
+                                Flavor.FUNCTION,
+                                Flavor.CLASS,
+                                Flavor.METHOD,
+                                Flavor.MODULE,
                             ):
-                                # Extract the qualified name from the node
-                                # Format: <Node kind:qualified.name>
-                                if ":" in node_str and ">" in node_str:
-                                    parts = node_str.split(":", 1)
-                                    if len(parts) == 2:
-                                        qualified_name = parts[1].rstrip(">")
-                                        nodes[qualified_name] = {"node": node_str}
+                                qualified_name = node.get_name()
+                                # Get kind from flavor
+                                kind_str = self._flavor_to_kind(node.flavor)
+
+                                # Get file and line number
+                                file_path = Path(node.filename)
+                                line_num = 1  # Default for module
+                                if node.ast_node and hasattr(node.ast_node, "lineno"):
+                                    line_num = node.ast_node.lineno
+
+                                # Get docstring if available
+                                docstring = None
+                                if node.ast_node and hasattr(node.ast_node, "body"):
+                                    import ast
+
+                                    docstring = ast.get_docstring(node.ast_node)
+
+                                metadata = SymbolMetadata(
+                                    qualified_name=qualified_name,
+                                    kind=kind_str,
+                                    file=file_path,
+                                    line=line_num,
+                                    docstring=docstring,
+                                )
+                                nodes[qualified_name] = metadata
 
                 # Extract edges from defines_edges (function/method calls)
                 if hasattr(visitor, "defines_edges"):
                     for from_node, to_nodes_set in visitor.defines_edges.items():
-                        from_str = str(from_node)
-                        # Extract qualified name from node string
-                        if ":" in from_str and ">" in from_str:
-                            from_str = from_str.split(":", 1)[1].rstrip(">")
+                        from_str = from_node.get_name()
 
-                            # Extract all nodes this one defines
-                            for to_node in to_nodes_set:
-                                to_str = str(to_node)
-                                if ":" in to_str and ">" in to_str:
-                                    to_str = to_str.split(":", 1)[1].rstrip(">")
+                        # Extract all nodes this one defines
+                        for to_node in to_nodes_set:
+                            to_str = to_node.get_name()
 
-                                    # Filter out non-code nodes
-                                    if not to_str.startswith("*"):
-                                        edges.append((from_str, to_str))
+                            # Filter out non-code nodes (builtins, etc.)
+                            if not to_str.startswith("*"):
+                                edges.append((from_str, to_str))
 
                 return CallGraph(
                     nodes=nodes,
@@ -118,6 +145,26 @@ class PyanAnalyzer:
                 exception,
             )
             return CallGraph(files_analyzed=filtered_files)
+
+    def _flavor_to_kind(self, flavor: Any) -> str:
+        """Convert pyan Flavor to symbol kind string.
+
+        Args:
+            flavor: pyan Flavor enum value.
+
+        Returns:
+            Symbol kind string: "module", "class", "function", or "method".
+        """
+        flavor_str = str(flavor).lower()
+        if "module" in flavor_str:
+            return "module"
+        elif "class" in flavor_str:
+            return "class"
+        elif "method" in flavor_str:
+            return "method"
+        elif "function" in flavor_str:
+            return "function"
+        return "function"  # Default fallback
 
     def _filter_files(
         self,

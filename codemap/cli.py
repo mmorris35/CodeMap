@@ -186,27 +186,22 @@ def analyze_command(
         registry = SymbolRegistry()
         graph = DependencyGraph()
 
-        # Create Symbol objects from pyan nodes
-        for node_name in call_graph.nodes:
-            # Parse node name to determine kind
-            # pyan format: "module:name", "function:module.name", "method:module.class.name"
-            if ":" in node_name:
-                kind_str, qualified_name = node_name.split(":", 1)
-            else:
-                kind_str = "module"
-                qualified_name = node_name
-
-            # Map pyan kind to SymbolKind
+        # Create Symbol objects from pyan nodes with metadata
+        for qualified_name, metadata in call_graph.nodes.items():
+            # Map kind string to SymbolKind
             kind_mapping = {
                 "module": SymbolKind.MODULE,
                 "function": SymbolKind.FUNCTION,
                 "method": SymbolKind.METHOD,
                 "class": SymbolKind.CLASS,
             }
-            symbol_kind = kind_mapping.get(kind_str, SymbolKind.FUNCTION)
+            symbol_kind = kind_mapping.get(metadata.kind, SymbolKind.FUNCTION)
 
-            # Create location (file will be inferred later)
-            location = SourceLocation(file=source_path, line=1)
+            # Create location from metadata
+            location = SourceLocation(
+                file=metadata.file,
+                line=metadata.line,
+            )
 
             # Create symbol
             symbol = Symbol(
@@ -214,6 +209,7 @@ def analyze_command(
                 qualified_name=qualified_name,
                 kind=symbol_kind,
                 location=location,
+                docstring=metadata.docstring,
             )
 
             # Add to registry and graph
