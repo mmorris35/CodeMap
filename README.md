@@ -13,6 +13,18 @@ CodeMap analyzes your Python codebase and tells you exactly what will be affecte
 
 ---
 
+## Claude Code Installation
+
+> **For Claude Code Users**: Install the CodeMap MCP server with one command:
+>
+> ```bash
+> npx github:mmorris35/CodeMap
+> ```
+>
+> Then **restart Claude Code** to activate the MCP server. You can now ask Claude Code to analyze Python projects and check dependencies before making changes!
+
+---
+
 ## See Your Code Like Never Before
 
 This is what CodeMap generates from a real Flask application:
@@ -278,16 +290,7 @@ flowchart TD
 
 **The killer feature:** CodeMap gives Claude Code real-time dependency awareness. Before Claude modifies your code, it can check what will break.
 
-### Quick Setup (2 commands)
-
-```bash
-# Install the local MCP server
-npx github:mmorris35/CodeMap/local-mcp install --global
-
-# Restart Claude Code - done!
-```
-
-That's it. Claude Code now has access to these tools for any Python project:
+Claude Code now has access to these tools for any Python project:
 
 | Tool | What Claude Code Uses It For |
 |------|------------------------------|

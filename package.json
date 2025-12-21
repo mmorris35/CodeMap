@@ -1,0 +1,28 @@
+{
+  "name": "@mmorris35/codemap",
+  "version": "1.0.0",
+  "description": "CodeMap - Know what breaks before you break it",
+  "type": "module",
+  "bin": {
+    "codemap-mcp-install": "./install.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "keywords": [
+    "codemap",
+    "mcp",
+    "claude",
+    "code-analysis",
+    "dependency-graph"
+  ],
+  "author": "Mike Morris <mike@mikemorris.net>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmorris35/CodeMap.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
