@@ -18,7 +18,7 @@ CodeMap analyzes your Python codebase and tells you exactly what will be affecte
 > **For Claude Code Users**: Install the CodeMap MCP server with one command:
 >
 > ```bash
-> npx github:mmorris35/CodeMap
+> npx github:mmorris35/CodeMap#main
 > ```
 >
 > Then **restart Claude Code** to activate the MCP server. You can now ask Claude Code to analyze Python projects and check dependencies before making changes!
