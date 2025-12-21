@@ -116,13 +116,43 @@ please re-read claude.md and DEVELOPMENT_PLAN.md (the entire documents, for cont
 - [x] 6.3.3: Cloudflare Deployment and Testing
 
 ### Phase 7: Bugfixes & Enhancements
-- [ ] 7.1.1: Fix CLI Analyzer List Comprehension Bug
-- [ ] 7.1.2: Add /register Endpoint for API Key Self-Service
-- [ ] 7.1.3: Update Documentation with Registration Flow
+- [x] 7.1.1: Fix CLI Analyzer List Comprehension Bug
+- [x] 7.1.2: Add /register Endpoint for API Key Self-Service
+- [x] 7.1.3: Update Documentation with Registration Flow
 
-**Current**: Phase 7 - Bugfixes
-**Status**: CodeMap MCP Server live at https://codemap-mcp.mike-c63.workers.dev
-**Next**: Fix CLI analyzer bug and add API key registration
+### Phase 8: Local MCP Server (npm package)
+- [x] 8.1.1: Create local-mcp Package Structure
+- [x] 8.1.2: Implement Tree-sitter Python Parser
+- [x] 8.1.3: Implement MCP Server with analyze Tool
+- [x] 8.1.4: Add CLI with Install Command
+- [ ] 8.1.5: Publish to npm
+
+**Completion Notes (8.1.1-8.1.4):**
+- **Implementation**: Built complete npm package with tree-sitter Python analysis
+- **Files Created**:
+  - `local-mcp/package.json` - npm package configuration
+  - `local-mcp/tsconfig.json` - TypeScript configuration
+  - `local-mcp/bin/cli.js` - CLI entry point
+  - `local-mcp/src/types.ts` - TypeScript type definitions
+  - `local-mcp/src/analyzer.ts` - Tree-sitter Python parser (335 lines)
+  - `local-mcp/src/tools.ts` - MCP tool implementations (306 lines)
+  - `local-mcp/src/mcp-server.ts` - MCP protocol handler (355 lines)
+  - `local-mcp/src/cli.ts` - CLI commands: install, serve, analyze, list, show
+  - `local-mcp/src/index.ts` - Package entry point
+  - `local-mcp/README.md` - Documentation
+- **Features**:
+  - `codemap-mcp install --global` - Auto-configure Claude Code
+  - `codemap-mcp analyze <path>` - Analyze Python project
+  - `codemap-mcp serve` - Run MCP server (stdio)
+  - Tree-sitter parsing for Python (no pyan3 dependency)
+  - Local storage in `~/.codemap/`
+- **MCP Tools**: analyze_project, get_dependents, get_impact_report, check_breaking_change, get_architecture
+- **Build**: npm run build passes, CLI verified working
+- **Status**: Ready for npm publish
+
+**Current**: Phase 8 - Local MCP Server
+**Status**: Package complete, ready to publish
+**Next**: `npm publish` to make available globally
 
 ---
 

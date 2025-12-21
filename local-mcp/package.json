@@ -1,0 +1,56 @@
+{
+  "name": "codemap-mcp",
+  "version": "1.0.0",
+  "description": "Local MCP server for Python code dependency analysis - works with Claude Code",
+  "main": "dist/index.js",
+  "bin": {
+    "codemap-mcp": "./bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "code-analysis",
+    "dependency-graph",
+    "python",
+    "ast"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmorris35/CodeMap.git",
+    "directory": "local-mcp"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-python": "^0.23.6",
+    "glob": "^11.0.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "eslint": "^9.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ]
+}
