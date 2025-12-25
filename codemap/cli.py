@@ -24,6 +24,7 @@ from codemap.analyzer import (
 from codemap.config import CodeMapConfig, load_config
 from codemap.logging_config import get_logger, setup_logging
 from codemap.output import (
+    ArchitectureGenerator,
     CodeMapGenerator,
     DevPlanParser,
     DriftReportGenerator,
@@ -116,8 +117,8 @@ def analyze_command(
 
     Performs AST analysis on Python files to extract all symbols (modules,
     classes, functions) and their dependencies. Generates:
-    - CODE_MAP.json: Complete dependency graph
-    - ARCHITECTURE.mermaid: Module-level diagram
+    - CODE_MAP.json: Complete dependency graph (in .codemap/)
+    - ARCHITECTURE.md: Module diagram and documentation (in project root)
 
     This is the first command to run in CodeMap workflow.
 
@@ -232,23 +233,28 @@ def analyze_command(
             source_root=str(config.source_dir),
         )
 
-        # Save CODE_MAP.json
+        # Save CODE_MAP.json to output directory
         config.output_dir.mkdir(parents=True, exist_ok=True)
         codemap_path = config.output_dir / "CODE_MAP.json"
         codemap_generator.save(code_map, codemap_path)
         click.echo(f"Saved CODE_MAP.json to {codemap_path}")
 
-        # Generate ARCHITECTURE.mermaid
-        mermaid_generator = MermaidGenerator()
-        architecture_diagram = mermaid_generator.generate_module_diagram(graph)
-        architecture_path = config.output_dir / "ARCHITECTURE.mermaid"
-        with open(architecture_path, "w", encoding="utf-8") as f:
-            f.write(architecture_diagram)
-        click.echo(f"Saved ARCHITECTURE.mermaid to {architecture_path}")
-
-        click.echo(
-            f"\nAnalysis complete! Generated files in {config.output_dir}",
+        # Generate ARCHITECTURE.md to source directory (project root)
+        project_name = config.source_dir.name or "Project"
+        arch_generator = ArchitectureGenerator()
+        architecture_md = arch_generator.generate(
+            graph=graph,
+            code_map=code_map,
+            project_name=project_name,
         )
+        architecture_path = config.source_dir / "ARCHITECTURE.md"
+        with open(architecture_path, "w", encoding="utf-8") as f:
+            f.write(architecture_md)
+        click.echo(f"Saved ARCHITECTURE.md to {architecture_path}")
+
+        click.echo("\nAnalysis complete!")
+        click.echo(f"  - CODE_MAP.json: {codemap_path}")
+        click.echo(f"  - ARCHITECTURE.md: {architecture_path}")
 
     except (FileNotFoundError, ValueError, OSError) as exception:
         click.echo(f"Error: {exception}", err=True)

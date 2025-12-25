@@ -126,6 +126,9 @@ dmypy.json
 .codemap/
 *.codemap
 
+# Test fixture generated files
+tests/fixtures/sample_project/ARCHITECTURE.md
+
 # IDE
 .vscode/
 .idea/

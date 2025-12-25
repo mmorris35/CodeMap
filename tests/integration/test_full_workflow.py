@@ -13,7 +13,7 @@ from click.testing import CliRunner
 from codemap.cli import cli
 
 
-@pytest.fixture()  # type: ignore[misc]
+@pytest.fixture()
 def sample_project_path() -> Path:
     """Get path to sample project for testing.
 
@@ -23,7 +23,7 @@ def sample_project_path() -> Path:
     return Path(__file__).parent.parent / "fixtures" / "sample_project"
 
 
-@pytest.fixture()  # type: ignore[misc]
+@pytest.fixture()
 def temp_output_dir() -> Generator[Path, None, None]:
     """Create a temporary output directory for test runs.
 
@@ -73,11 +73,11 @@ def test_analyze_command_generates_code_map(
         assert "symbols" in code_map or "dependencies" in code_map
 
 
-def test_analyze_generates_mermaid_diagram(
+def test_analyze_generates_architecture_md(
     sample_project_path: Path,
     temp_output_dir: Path,
 ) -> None:
-    """Test that 'codemap analyze' generates ARCHITECTURE.mermaid.
+    """Test that 'codemap analyze' generates ARCHITECTURE.md.
 
     Args:
         sample_project_path: Path to sample project.
@@ -98,16 +98,18 @@ def test_analyze_generates_mermaid_diagram(
 
     assert result.exit_code == 0
 
-    # Verify ARCHITECTURE.mermaid was created
-    mermaid_path = temp_output_dir / "ARCHITECTURE.mermaid"
-    assert mermaid_path.exists(), "ARCHITECTURE.mermaid not created"
+    # Verify ARCHITECTURE.md was created in source directory (project root)
+    architecture_path = sample_project_path / "ARCHITECTURE.md"
+    assert architecture_path.exists(), "ARCHITECTURE.md not created"
 
-    # Verify mermaid file has content
-    with open(mermaid_path) as f:
-        mermaid_content = f.read()
+    # Verify architecture file has content
+    with open(architecture_path) as f:
+        architecture_content = f.read()
 
-    assert len(mermaid_content) > 0, "ARCHITECTURE.mermaid is empty"
-    assert "flowchart" in mermaid_content or "graph" in mermaid_content
+    assert len(architecture_content) > 0, "ARCHITECTURE.md is empty"
+    # Should contain mermaid diagram in markdown code block
+    assert "```mermaid" in architecture_content
+    assert "flowchart" in architecture_content or "## Summary" in architecture_content
 
 
 def test_analyzed_symbols_contain_expected_modules(
