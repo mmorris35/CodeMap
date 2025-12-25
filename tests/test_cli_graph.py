@@ -69,8 +69,13 @@ def sample_code_map(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_graph_missing_code_map(runner: CliRunner) -> None:
+def test_graph_missing_code_map(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command when CODE_MAP.json is missing."""
+    # Change to a temp directory with no .codemap/CODE_MAP.json
+    monkeypatch.chdir(tmp_path)
+
     result = runner.invoke(
         cli,
         ["graph"],
@@ -80,78 +85,98 @@ def test_graph_missing_code_map(runner: CliRunner) -> None:
     assert "not found" in result.output.lower() or "error" in result.output.lower()
 
 
-def test_graph_module_level(runner: CliRunner, sample_code_map: Path) -> None:
+def test_graph_module_level(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command with module level (default)."""
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph"],
-        )
+    monkeypatch.chdir(sample_code_map)
 
-        # Check for flowchart syntax in output if successful
-        if result.exit_code == 0:
-            assert "flowchart" in result.output or "digraph" in result.output
+    result = runner.invoke(
+        cli,
+        ["graph"],
+    )
+
+    # Check for flowchart syntax in output if successful
+    if result.exit_code == 0:
+        assert "flowchart" in result.output or "digraph" in result.output
 
 
-def test_graph_function_level(runner: CliRunner, sample_code_map: Path) -> None:
+def test_graph_function_level(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command with function level."""
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph", "--level", "function", "--module", "auth"],
-        )
+    monkeypatch.chdir(sample_code_map)
 
-        assert result.exit_code in (0, 1)
+    result = runner.invoke(
+        cli,
+        ["graph", "--level", "function", "--module", "auth"],
+    )
+
+    assert result.exit_code in (0, 1)
 
 
-def test_graph_function_level_without_module(runner: CliRunner, sample_code_map: Path) -> None:
+def test_graph_function_level_without_module(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command function level without --module fails."""
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph", "--level", "function"],
-        )
+    monkeypatch.chdir(sample_code_map)
 
-        assert result.exit_code == 1
-        assert "module" in result.output.lower() or "required" in result.output.lower()
+    result = runner.invoke(
+        cli,
+        ["graph", "--level", "function"],
+    )
+
+    assert result.exit_code == 1
+    assert "module" in result.output.lower() or "required" in result.output.lower()
 
 
-def test_graph_format_mermaid(runner: CliRunner, sample_code_map: Path) -> None:
+def test_graph_format_mermaid(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command with mermaid format."""
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph", "--format", "mermaid"],
-        )
+    monkeypatch.chdir(sample_code_map)
 
-        if result.exit_code == 0:
-            assert "flowchart" in result.output or "TD" in result.output
+    result = runner.invoke(
+        cli,
+        ["graph", "--format", "mermaid"],
+    )
+
+    if result.exit_code == 0:
+        assert "flowchart" in result.output or "TD" in result.output
 
 
-def test_graph_format_dot(runner: CliRunner, sample_code_map: Path) -> None:
+def test_graph_format_dot(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test graph command with dot format."""
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph", "--format", "dot"],
-        )
+    monkeypatch.chdir(sample_code_map)
 
-        if result.exit_code == 0:
-            assert "digraph" in result.output or "->" in result.output
+    result = runner.invoke(
+        cli,
+        ["graph", "--format", "dot"],
+    )
+
+    if result.exit_code == 0:
+        assert "digraph" in result.output or "->" in result.output
 
 
-def test_graph_output_file(runner: CliRunner, sample_code_map: Path, tmp_path: Path) -> None:
+def test_graph_output_file(
+    runner: CliRunner,
+    sample_code_map: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test graph command with output file."""
     output_file = tmp_path / "graph.mermaid"
+    monkeypatch.chdir(sample_code_map)
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["graph", "--output", str(output_file)],
-        )
+    result = runner.invoke(
+        cli,
+        ["graph", "--output", str(output_file)],
+    )
 
-        # Should complete without error
-        assert result.exit_code in (0, 1)
+    # Should complete without error
+    assert result.exit_code in (0, 1)
 
 
 def test_graph_help(runner: CliRunner) -> None:

@@ -64,8 +64,13 @@ Description of setup.
     return devplan_path
 
 
-def test_drift_missing_code_map(runner: CliRunner, sample_devplan: Path) -> None:
+def test_drift_missing_code_map(
+    runner: CliRunner, sample_devplan: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test drift command when CODE_MAP.json is missing."""
+    # Change to devplan's parent directory (no .codemap/ exists there)
+    monkeypatch.chdir(sample_devplan.parent)
+
     result = runner.invoke(
         cli,
         ["drift", "--devplan", str(sample_devplan)],
@@ -75,51 +80,66 @@ def test_drift_missing_code_map(runner: CliRunner, sample_devplan: Path) -> None
     assert "not found" in result.output.lower() or "error" in result.output.lower()
 
 
-def test_drift_markdown_format(runner: CliRunner, sample_code_map: Path) -> None:
+def test_drift_markdown_format(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test drift command with markdown format."""
-    devplan_path = sample_code_map.parent / "DEVELOPMENT_PLAN.md"
+    devplan_path = sample_code_map / "DEVELOPMENT_PLAN.md"
     devplan_path.write_text("# Test Plan\n")
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["drift", "--devplan", "DEVELOPMENT_PLAN.md", "--format", "markdown"],
-        )
+    # Change to the directory with .codemap/CODE_MAP.json
+    monkeypatch.chdir(sample_code_map)
 
-        # Should exit with 0 or 1 based on drift
-        assert result.exit_code in (0, 1)
+    result = runner.invoke(
+        cli,
+        ["drift", "--devplan", str(devplan_path), "--format", "markdown"],
+    )
+
+    # Should exit with 0 or 1 based on drift
+    assert result.exit_code in (0, 1)
 
 
-def test_drift_json_format(runner: CliRunner, sample_code_map: Path) -> None:
+def test_drift_json_format(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test drift command with JSON format."""
-    devplan_path = sample_code_map.parent / "DEVELOPMENT_PLAN.md"
+    devplan_path = sample_code_map / "DEVELOPMENT_PLAN.md"
     devplan_path.write_text("# Test Plan\n")
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["drift", "--devplan", "DEVELOPMENT_PLAN.md", "--format", "json"],
-        )
+    # Change to the directory with .codemap/CODE_MAP.json
+    monkeypatch.chdir(sample_code_map)
 
-        assert result.exit_code in (0, 1)
-        # Check if output looks like JSON
-        if result.exit_code == 0 or "format" in result.output:
-            pass  # Valid response
+    result = runner.invoke(
+        cli,
+        ["drift", "--devplan", str(devplan_path), "--format", "json"],
+    )
+
+    assert result.exit_code in (0, 1)
+    # Check if output looks like JSON
+    if result.exit_code == 0 or "format" in result.output:
+        pass  # Valid response
 
 
-def test_drift_output_file(runner: CliRunner, sample_code_map: Path, tmp_path: Path) -> None:
+def test_drift_output_file(
+    runner: CliRunner,
+    sample_code_map: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test drift command with output file."""
-    devplan_path = sample_code_map.parent / "DEVELOPMENT_PLAN.md"
+    devplan_path = sample_code_map / "DEVELOPMENT_PLAN.md"
     devplan_path.write_text("# Test Plan\n")
     output_file = tmp_path / "drift_report.md"
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["drift", "--devplan", "DEVELOPMENT_PLAN.md", "--output", str(output_file)],
-        )
+    # Change to the directory with .codemap/CODE_MAP.json
+    monkeypatch.chdir(sample_code_map)
 
-        assert result.exit_code in (0, 1)
+    result = runner.invoke(
+        cli,
+        ["drift", "--devplan", str(devplan_path), "--output", str(output_file)],
+    )
+
+    assert result.exit_code in (0, 1)
 
 
 def test_drift_no_devplan_argument(runner: CliRunner) -> None:

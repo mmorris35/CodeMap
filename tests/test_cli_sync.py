@@ -64,8 +64,13 @@ Some content about setting up the CLI.
     return devplan_path
 
 
-def test_sync_missing_code_map(runner: CliRunner, sample_devplan: Path) -> None:
+def test_sync_missing_code_map(
+    runner: CliRunner, sample_devplan: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test sync command when CODE_MAP.json is missing."""
+    # Change to devplan's parent directory (no .codemap/ exists there)
+    monkeypatch.chdir(sample_devplan.parent)
+
     result = runner.invoke(
         cli,
         ["sync", "--devplan", str(sample_devplan)],
@@ -75,32 +80,40 @@ def test_sync_missing_code_map(runner: CliRunner, sample_devplan: Path) -> None:
     assert "not found" in result.output.lower() or "error" in result.output.lower()
 
 
-def test_sync_dry_run(runner: CliRunner, sample_code_map: Path) -> None:
+def test_sync_dry_run(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test sync command dry run (no --update-map)."""
-    devplan_path = sample_code_map.parent / "DEVELOPMENT_PLAN.md"
+    devplan_path = sample_code_map / "DEVELOPMENT_PLAN.md"
     devplan_path.write_text("# Test Plan\n")
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["sync", "--devplan", "DEVELOPMENT_PLAN.md"],
-        )
+    # Change to the directory with .codemap/CODE_MAP.json
+    monkeypatch.chdir(sample_code_map)
 
-        assert "Use --update-map" in result.output or result.exit_code in (0, 1)
+    result = runner.invoke(
+        cli,
+        ["sync", "--devplan", str(devplan_path)],
+    )
+
+    assert "Use --update-map" in result.output or result.exit_code in (0, 1)
 
 
-def test_sync_with_update_flag(runner: CliRunner, sample_code_map: Path) -> None:
+def test_sync_with_update_flag(
+    runner: CliRunner, sample_code_map: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test sync command with --update-map flag."""
-    devplan_path = sample_code_map.parent / "DEVELOPMENT_PLAN.md"
+    devplan_path = sample_code_map / "DEVELOPMENT_PLAN.md"
     devplan_path.write_text("# Test Plan\n")
 
-    with runner.isolated_filesystem(temp_dir=sample_code_map.parent):
-        result = runner.invoke(
-            cli,
-            ["sync", "--devplan", "DEVELOPMENT_PLAN.md", "--update-map"],
-        )
+    # Change to the directory with .codemap/CODE_MAP.json
+    monkeypatch.chdir(sample_code_map)
 
-        assert result.exit_code in (0, 1)
+    result = runner.invoke(
+        cli,
+        ["sync", "--devplan", str(devplan_path), "--update-map"],
+    )
+
+    assert result.exit_code in (0, 1)
 
 
 def test_sync_no_devplan_argument(runner: CliRunner) -> None:
