@@ -91,3 +91,8 @@ addopts = "--strict-markers"
 markers = [
     "benchmark: marks tests as performance benchmarks (deselect with '-m \"not benchmark\"')",
 ]
+filterwarnings = [
+    # Suppress pyan3 deprecation warnings (upstream issue, can't fix)
+    "ignore:ast.Num is deprecated:DeprecationWarning",
+    "ignore:ast.Str is deprecated:DeprecationWarning",
+]
