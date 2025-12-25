@@ -269,7 +269,7 @@ describe("MCP Handler", () => {
         userId,
       )) as any;
 
-      expect(response.result.tools).toHaveLength(4);
+      expect(response.result.tools).toHaveLength(5);
     });
 
     it("should include get_dependents tool", async () => {
@@ -338,6 +338,23 @@ describe("MCP Handler", () => {
       const toolNames = response.result.tools.map((t: any) => t.name);
 
       expect(toolNames).toContain("get_architecture");
+    });
+
+    it("should include analyze_project tool", async () => {
+      const request = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+      };
+
+      const response = (await handleMcpRequest(
+        request,
+        storage,
+        userId,
+      )) as any;
+      const toolNames = response.result.tools.map((t: any) => t.name);
+
+      expect(toolNames).toContain("analyze_project");
     });
 
     it("should include tool descriptions", async () => {

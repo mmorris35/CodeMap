@@ -23,6 +23,7 @@ import { handleGetDependents } from "./tools/get-dependents";
 import { handleGetImpactReport } from "./tools/get-impact-report";
 import { handleCheckBreakingChange } from "./tools/check-breaking-change";
 import { handleGetArchitecture } from "./tools/get-architecture";
+import { handleAnalyzeProject } from "./tools/analyze-project";
 import { readResource } from "./resources";
 
 /**
@@ -130,6 +131,29 @@ const TOOLS: Tool[] = [
         },
       },
       required: ["project_id"],
+    },
+  },
+  {
+    name: "analyze_project",
+    description:
+      "Analyze Python source code and generate a CODE_MAP. Accepts Python code directly as input, extracts symbols and dependencies, and stores the result for use by other tools.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: {
+          type: "string",
+          description: "Identifier for this project (used to store the CODE_MAP)",
+        },
+        files: {
+          type: "object",
+          description:
+            "Mapping of file paths to Python source code (e.g., {'src/main.py': 'def hello(): pass', 'src/utils.py': '...'})",
+          additionalProperties: {
+            type: "string",
+          },
+        },
+      },
+      required: ["project_id", "files"],
     },
   },
 ];
@@ -398,6 +422,14 @@ async function handleToolCall(
 
     case "get_architecture":
       result = await handleGetArchitecture(
+        storage,
+        userId,
+        toolArgs as Record<string, unknown>,
+      );
+      break;
+
+    case "analyze_project":
+      result = await handleAnalyzeProject(
         storage,
         userId,
         toolArgs as Record<string, unknown>,

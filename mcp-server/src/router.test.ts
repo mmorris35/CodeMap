@@ -318,7 +318,7 @@ describe("Router - MCP Protocol Route", () => {
 
     expect(data.result.tools).toBeDefined();
     expect(Array.isArray(data.result.tools)).toBe(true);
-    expect(data.result.tools.length).toBe(4);
+    expect(data.result.tools.length).toBe(5);
   });
 
   it("POST /mcp resources/list returns available resources", async () => {
